@@ -1,62 +1,64 @@
 const AuthService = require('../services/authService');
-const { registerSchema, loginSchema } = require('../validators/authValidator');
-const { ZodError } = require('zod');
 
 const register = async (req, res, next) => {
   try {
-    // Validate request body against Zod schema
-    const validatedData = registerSchema.parse(req.body);
+    const { user, token } = await AuthService.register(req.body);
     
-    // Call service
-    const { user, token } = await AuthService.register(validatedData);
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    };
     
-    res.status(201).json({ 
-      success: true, 
-      token, 
-      user 
-    });
-  } catch (err) {
-    if (err instanceof ZodError) {
-      return res.status(400).json({ 
-        success: false, 
-        errors: err.errors.map(e => e.message) 
+    res.status(201)
+      .cookie('token', token, cookieOptions)
+      .json({ 
+        success: true, 
+        user 
       });
-    }
+  } catch (err) {
     next(err);
   }
 };
 
 const login = async (req, res, next) => {
   try {
-    const validatedData = loginSchema.parse(req.body);
-    const { user, token } = await AuthService.login(validatedData.email, validatedData.password);
+    const { email, password } = req.body;
+    const { user, token } = await AuthService.login(email, password);
     
-    res.json({ 
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    };
+
+    res.cookie('token', token, cookieOptions).json({ 
       success: true, 
-      token, 
       user 
     });
   } catch (err) {
-    if (err instanceof ZodError) {
-       return res.status(400).json({ 
-        success: false, 
-        errors: err.errors.map(e => e.message) 
-      });
-    }
     next(err);
   }
 };
 
 const getMe = async (req, res, next) => {
   try {
-    // req.user is set by auth middleware
-    if (!req.user) {
-      return res.status(401).json({ success: false, error: 'Not authenticated' });
-    }
+    // req.user is guaranteed to be set — the authenticate middleware runs first
     res.json({ success: true, user: req.user });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { register, login, getMe };
+const logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Strict'
+  });
+  res.json({ success: true, message: 'Logged out successfully' });
+};
+
+module.exports = { register, login, getMe, logout };

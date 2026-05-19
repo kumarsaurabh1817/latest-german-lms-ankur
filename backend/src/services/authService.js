@@ -11,9 +11,10 @@ const generateToken = (userId) => {
 class AuthService {
   static async register(userData) {
     const { email, password, role } = userData;
+    const normalizedEmail = email.trim().toLowerCase();
 
     // Check existing
-    const existingUser = await UserModel.findByEmail(email);
+    const existingUser = await UserModel.findByEmail(normalizedEmail);
     if (existingUser) {
       const error = new Error('Email already registered');
       error.statusCode = 409;
@@ -28,6 +29,7 @@ class AuthService {
     // Create new user
     const newUser = await UserModel.create({
       ...userData,
+      email: normalizedEmail,
       password: hashedPassword,
       role: normalizedRole,
       is_teacher_approved: isTeacherApproved,
@@ -39,7 +41,8 @@ class AuthService {
   }
 
   static async login(email, password) {
-    const user = await UserModel.findByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await UserModel.findByEmail(normalizedEmail);
     if (!user) {
       const error = new Error('Please create an account first');
       error.statusCode = 404;

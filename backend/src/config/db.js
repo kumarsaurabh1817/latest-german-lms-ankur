@@ -2,7 +2,8 @@ const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }, // Critical for Neon DB
+  // SSL is required for hosted DBs (Neon, Supabase, etc.) but breaks local Postgres
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
 module.exports = {

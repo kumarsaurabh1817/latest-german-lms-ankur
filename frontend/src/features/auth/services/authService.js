@@ -1,19 +1,13 @@
-import api, { setAuthToken } from '../../../utils/api';
+import api from '../../../utils/api';
 
 const AuthService = {
     register: async (userData) => {
         const response = await api.post('/auth/register', userData);
-        if (response.data.success) {
-            setAuthToken(response.data.token);
-        }
         return response.data;
     },
 
     login: async (credentials) => {
         const response = await api.post('/auth/login', credentials);
-        if (response.data.success) {
-            setAuthToken(response.data.token);
-        }
         return response.data;
     },
 
@@ -22,9 +16,8 @@ const AuthService = {
         return response.data;
     },
 
-    logout: () => {
-        localStorage.removeItem('token');
-        setAuthToken(null);
+    logout: async () => {
+        await api.post('/auth/logout');
     }
 };
 

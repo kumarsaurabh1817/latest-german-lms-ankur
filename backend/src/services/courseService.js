@@ -105,6 +105,11 @@ class CourseService {
       error.statusCode = 404;
       throw error;
     }
+    if (!course.is_active) {
+      const error = new Error('Cannot add modules to a deactivated course');
+      error.statusCode = 403;
+      throw error;
+    }
 
     if (user.role === 'teacher' && String(course.teacher_id) !== String(user.id)) {
       const error = new Error('Forbidden: you do not own this course');

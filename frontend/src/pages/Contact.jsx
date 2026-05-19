@@ -1,14 +1,31 @@
 import { useState } from 'react';
+import api from '../utils/api';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const Contact = () => {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setError('');
+    setLoading(true);
+    try {
+      await api.post('/contact', form);
+      setSubmitted(true);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Failed to send message. Please try again or email us directly.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -32,32 +49,45 @@ const Contact = () => {
                   </svg>
                 </div>
                 <h3 className="font-semibold text-neutral-900 text-lg">Message Sent!</h3>
-                <p className="text-neutral-500 text-sm mt-2">We'll get back to you within 24 hours.</p>
-                <button onClick={() => { setSubmitted(false); setForm({ name: '', email: '', subject: '', message: '' }); }} className="btn-secondary mt-6">
+                <p className="text-neutral-500 text-sm mt-2">
+                  Thank you, {form.name}! We've received your message and will get back to you at <strong>{form.email}</strong> within 24 hours.
+                </p>
+                <button
+                  onClick={() => { setSubmitted(false); setForm({ name: '', email: '', subject: '', message: '' }); }}
+                  className="btn-secondary mt-6"
+                >
                   Send Another Message
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="label">Name</label>
+                    <label className="label">Name *</label>
                     <input name="name" value={form.name} onChange={handleChange} className="input" placeholder="Your name" required />
                   </div>
                   <div>
-                    <label className="label">Email</label>
+                    <label className="label">Email *</label>
                     <input type="email" name="email" value={form.email} onChange={handleChange} className="input" placeholder="your@email.com" required />
                   </div>
                 </div>
                 <div>
-                  <label className="label">Subject</label>
+                  <label className="label">Subject *</label>
                   <input name="subject" value={form.subject} onChange={handleChange} className="input" placeholder="What is this about?" required />
                 </div>
                 <div>
-                  <label className="label">Message</label>
+                  <label className="label">Message *</label>
                   <textarea name="message" value={form.message} onChange={handleChange} rows={5} className="input resize-none" placeholder="Your message..." required />
                 </div>
-                <button type="submit" className="btn-primary w-full">Send Message</button>
+                <button type="submit" className="btn-primary w-full" disabled={loading}>
+                  {loading
+                    ? <span className="flex items-center justify-center gap-2"><LoadingSpinner size="sm" /> Sending…</span>
+                    : 'Send Message'
+                  }
+                </button>
               </form>
             )}
           </div>

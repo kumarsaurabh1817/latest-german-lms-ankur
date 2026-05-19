@@ -27,7 +27,7 @@ const Login = () => {
       navigate(from, { replace: true });
     } catch (err) {
       const errorData = err.response?.data;
-      const errorMessage = errorData?.message || errorData?.error || (Array.isArray(errorData?.errors) ? errorData.errors.join(', ') : 'Invalid email or password');
+      const errorMessage = errorData?.message || errorData?.error || (Array.isArray(errorData?.errors) ? errorData.errors[0]?.message : 'Invalid email or password');
       setError(errorMessage);
     } finally {
       setLoading(false);

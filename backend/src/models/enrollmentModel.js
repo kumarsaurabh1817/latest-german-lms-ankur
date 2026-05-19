@@ -16,13 +16,11 @@ class EnrollmentModel {
     const result = await db.query(
       `SELECT e.*, c.title, c.level, c.thumbnail_url, c.duration_weeks,
         u.name as teacher_name,
-        COUNT(DISTINCT l.id) as total_lessons,
-        COUNT(DISTINCT l2.id) as completed_lessons
+        COUNT(DISTINCT l.id) as total_lessons
        FROM enrollments e
        JOIN courses c ON e.course_id = c.id
        LEFT JOIN users u ON c.teacher_id = u.id
        LEFT JOIN lessons l ON l.course_id = c.id
-       LEFT JOIN lessons l2 ON l2.course_id = c.id AND l2.is_completed = true
        WHERE e.student_id = $1 AND e.is_active = true AND c.is_active = true
        GROUP BY e.id, c.title, c.level, c.thumbnail_url, c.duration_weeks, u.name`,
       [student_id]

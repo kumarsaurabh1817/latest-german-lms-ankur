@@ -6,17 +6,77 @@ import { useAuth } from '../../../context/AuthContext';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
-const loadScript = (src) => {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
+// Non-blocking replacement for window.confirm() using react-hot-toast
+const confirmAction = (message) =>
+  new Promise((resolve) => {
+    toast(
+      (t) => (
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            border: '1px solid #e5e7eb',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#111827', lineHeight: '1.5' }}>
+            {message}
+          </p>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button
+              style={{
+                padding: '5px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                background: '#f9fafb',
+                color: '#374151',
+                cursor: 'pointer',
+              }}
+              onClick={() => { toast.dismiss(t.id); resolve(false); }}
+            >
+              Cancel
+            </button>
+            <button
+              style={{
+                padding: '5px 14px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderRadius: '6px',
+                border: 'none',
+                background: '#ef4444',
+                color: '#ffffff',
+                cursor: 'pointer',
+              }}
+              onClick={() => { toast.dismiss(t.id); resolve(true); }}
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        duration: Infinity,
+        style: {
+          padding: 0,
+          background: 'transparent',
+          boxShadow: 'none',
+          maxWidth: '380px',
+        },
+      }
+    );
   });
-};
+
 
 const levelLabels = { A1: 'Beginner', A2: 'Elementary', B1: 'Intermediate', B2: 'Upper Intermediate' };
+const COURSE_TITLE_MIN = 5;
+const COURSE_TITLE_MAX = 120;
+const COURSE_FEATURE_TEXT_MAX = 80;
 
 const CourseDetail = () => {
   const { id } = useParams();
@@ -28,7 +88,8 @@ const CourseDetail = () => {
   const [enrolling, setEnrolling] = useState(null);
 
   const handleDeleteCourse = async () => {
-    if (!window.confirm("Are you sure you want to delete this course? All modules, lessons, and student access will be permanently lost.")) return;
+    const confirmed = await confirmAction('Delete this course? All modules, lessons, and student access will be permanently lost.');
+    if (!confirmed) return;
     try {
       await api.delete(`/courses/${id}`);
       toast.success('Course deleted successfully');
@@ -51,6 +112,7 @@ const CourseDetail = () => {
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [editingCourse, setEditingCourse] = useState(false);
   const [courseFormEdit, setCourseFormEdit] = useState(null);
+  const [courseFeatureInput, setCourseFeatureInput] = useState('');
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
 
@@ -97,7 +159,7 @@ const CourseDetail = () => {
       setModuleForm({ title: '', description: '', order_index: modules.length + 1 });
       setModules([...modules, { ...newModule, lessons: [] }]);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to create module');
+      toast.error(err.response?.data?.error || 'Failed to create module');
     }
   };
 
@@ -117,7 +179,7 @@ const CourseDetail = () => {
         };
       }));
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to schedule class');
+      toast.error(err.response?.data?.error || 'Failed to schedule class');
     } finally {
       setScheduling(false);
     }
@@ -131,53 +193,19 @@ const handleEnroll = async (method) => {
     setEnrolling(method);
     try {
       if (method === 'razorpay') {
-        const res = await loadScript('https://checkout.razorpay.com/v1/checkout.js');
-        if (!res) {
-          toast.error('Razorpay SDK failed to load. Are you online?');
-          setEnrolling(null);
-          return;
-        }
-
-        const { data: orderRes } = await api.post('/payments/razorpay/order', { course_id: id });
-        const orderData = orderRes.data ?? orderRes; // handle {success, data} or plain shape
-        const options = {
-          key: orderData.key,
-          amount: orderData.amount,
-          currency: orderData.currency,
-          name: 'DeutschLernen',
-          description: course.title,
-          order_id: orderData.orderId,
-          handler: async (response) => {
-            try {
-              // Only send gateway-issued IDs — no payment_db_id or course_id from client
-              await api.post('/payments/razorpay/verify', {
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              setIsEnrolled(true);
-              toast.success('Enrollment confirmed! Welcome to the course.');
-              fetchCourseData();
-            } catch (verifyErr) {
-              toast.error(verifyErr.response?.data?.message || 'Payment verification failed');
-            }
-          },
-          prefill: { name: user.name, email: user.email, contact: user.phone || '' },
-          theme: { color: '#0ea5e9' }
-        };
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+        // Navigate to the dedicated Razorpay checkout page
+        navigate('/checkout/razorpay', {
+          state: { courseId: id, courseName: course.title },
+        });
+        setEnrolling(null);
+        return;
       } else if (method === 'stripe') {
-        // Stripe requires real Elements setup on the frontend.
-        // Until @stripe/stripe-js + @stripe/react-stripe-js are integrated,
-        // we surface a clear message instead of falling through to mock enrollment.
-        toast.error('Stripe payments require a full frontend integration (Stripe Elements). Please use Razorpay or contact support.');
-      } else if (method === 'free') {
-        // DEV/TEMP: Direct free enrollment (server uses req.user.id — no student_id spoofing)
-        await api.post('/enrollments', { course_id: id });
-        setIsEnrolled(true);
-        toast.success('Enrolled successfully (free)!');
-        fetchCourseData();
+        // Navigate to dedicated Stripe Elements checkout page
+        navigate('/checkout/stripe', {
+          state: { courseId: id, courseName: course.title },
+        });
+        setEnrolling(null);
+        return;
       }
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.error || 'Payment failed. Please check your connection.');
@@ -188,7 +216,8 @@ const handleEnroll = async (method) => {
 
   const handleUpdateModule = async (e, moduleId) => {
     e.preventDefault();
-    if (!window.confirm('Are you sure you want to save these changes to the module?')) return;
+    const confirmed = await confirmAction('Save these changes to the module?');
+    if (!confirmed) return;
     try {
       await api.put(`/courses/${id}/modules/${moduleId}`, editModuleForm);
       setModules(modules.map(mod => mod.id === moduleId ? { ...mod, ...editModuleForm } : mod));
@@ -201,7 +230,8 @@ const handleEnroll = async (method) => {
 
   const handleUpdateLesson = async (e, lessonId) => {
     e.preventDefault();
-    if (!window.confirm('Are you sure you want to save these changes to the lesson?')) return;
+    const confirmed = await confirmAction('Save these changes to the lesson?');
+    if (!confirmed) return;
     try {
       await api.put(`/lessons/${lessonId}`, editLessonForm);
       setModules(modules.map(mod => {
@@ -219,7 +249,8 @@ const handleEnroll = async (method) => {
   };
 
   const handleDeleteModule = async (moduleId) => {
-    if (!window.confirm('Are you sure you want to delete this module?')) return;
+    const confirmed = await confirmAction('Delete this module and all its lessons?');
+    if (!confirmed) return;
     try {
       await api.delete(`/courses/${id}/modules/${moduleId}`);
       setModules(modules.filter(mod => mod.id !== moduleId));
@@ -230,7 +261,8 @@ const handleEnroll = async (method) => {
   };
 
   const handleDeleteLesson = async (lessonId) => {
-    if (!window.confirm('Are you sure you want to delete this lesson?')) return;
+    const confirmed = await confirmAction('Delete this lesson permanently?');
+    if (!confirmed) return;
     try {
       await api.delete(`/lessons/${lessonId}`);
       setModules(modules.map(mod => {
@@ -248,9 +280,43 @@ const handleEnroll = async (method) => {
 
   const isTeacher = user?.id === course?.teacher_id || user?.role === 'admin';
 
+  const handleAddCourseFeature = () => {
+    const value = courseFeatureInput.trim();
+    if (!value) return;
+    setCourseFormEdit((prev) => {
+      if (!prev) return prev;
+      const prevFeatures = Array.isArray(prev.features) ? prev.features : [];
+      const exists = prevFeatures.some((feature) => feature.toLowerCase() === value.toLowerCase());
+      if (exists) return prev;
+      return { ...prev, features: [...prevFeatures, value] };
+    });
+    setCourseFeatureInput('');
+  };
+
+  const handleRemoveCourseFeature = (featureToRemove) => {
+    setCourseFormEdit((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        features: (prev.features || []).filter((feature) => feature !== featureToRemove),
+      };
+    });
+  };
+
   const handleUpdateCourse = async (e) => {
     e.preventDefault();
-    if (!window.confirm('Are you sure you want to save these changes to the course?')) return;
+    if (!courseFormEdit) return;
+    const trimmedTitle = courseFormEdit.title?.trim() || '';
+    if (trimmedTitle.length < COURSE_TITLE_MIN) {
+      toast.error(`Course title must be at least ${COURSE_TITLE_MIN} characters.`);
+      return;
+    }
+    if (trimmedTitle.length > COURSE_TITLE_MAX) {
+      toast.error(`Course title must be ${COURSE_TITLE_MAX} characters or fewer.`);
+      return;
+    }
+    const confirmed = await confirmAction('Save these changes to the course?');
+    if (!confirmed) return;
     try {
       await api.put(`/courses/${id}`, courseFormEdit);
       setCourse({ ...course, ...courseFormEdit });
@@ -269,8 +335,10 @@ const handleEnroll = async (method) => {
       price_inr: course.price_inr,
       price_usd: course.price_usd,
       duration_weeks: course.duration_weeks,
-      thumbnail_url: course.thumbnail_url || ''
+      thumbnail_url: course.thumbnail_url || '',
+      features: Array.isArray(course.features) ? course.features : [],
     });
+    setCourseFeatureInput('');
     setEditingCourse(true);
   };
 
@@ -346,7 +414,11 @@ const handleEnroll = async (method) => {
             {course.description && (
               <div>
                 <h2 className="text-2xl font-display font-semibold text-neutral-900 mb-4">About This Course</h2>
-                <p className="text-neutral-600 leading-relaxed whitespace-pre-line">{course.description}</p>
+                <div className="rounded-lg border border-neutral-200 bg-neutral-50/60 p-4 max-h-72 overflow-y-auto overflow-x-hidden">
+                  <p className="text-neutral-600 leading-relaxed whitespace-pre-wrap break-words">
+                    {course.description}
+                  </p>
+                </div>
               </div>
             )}
 
@@ -652,12 +724,21 @@ const handleEnroll = async (method) => {
                   )}
                 </div>
               )}
-              <ul className="space-y-2 mb-6 text-sm text-neutral-600">
-                <li className="flex items-center gap-2"><span className="text-secondary-500">✓</span> Live Zoom classes</li>
-                <li className="flex items-center gap-2"><span className="text-secondary-500">✓</span> Guided lesson notes</li>
-                <li className="flex items-center gap-2"><span className="text-secondary-500">✓</span> {course.duration_weeks || '–'} weeks access</li>
-                <li className="flex items-center gap-2"><span className="text-secondary-500">✓</span> Certificate of completion</li>
-              </ul>
+              {course.features?.length ? (
+                <div className="mb-6">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Course Features</p>
+                  <ul className="space-y-2 text-sm text-neutral-600">
+                    {course.features.map((feature, index) => (
+                      <li key={`${feature}-${index}`} className="flex items-start gap-2">
+                        <span className="text-secondary-500">✓</span>
+                        <span className="break-words">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-400 mb-6">No course features listed.</p>
+              )}
               {isEnrolled ? (
                 <Link to="/dashboard/student" className="btn-secondary w-full text-center block leading-[2.5rem]">Go to Dashboard</Link>
               ) : !user ? (
@@ -682,14 +763,6 @@ const handleEnroll = async (method) => {
                         {enrolling === 'stripe' ? <LoadingSpinner size="sm" /> : `Pay ${course.price_usd} USD (Stripe)`}
                       </button>
                     )}
-                    {/* DEV/TEMP: Free enroll button for testing — remove before production */}
-                    <button
-                      className="btn-secondary w-full border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 !py-2.5 mt-2"
-                      disabled={!!enrolling}
-                      onClick={() => handleEnroll('free')}
-                    >
-                      {enrolling === 'free' ? <LoadingSpinner size="sm" /> : 'Enroll for Free (Dev Only)'}
-                    </button>
                   </div>
                 ) : (
                   <button
@@ -727,11 +800,53 @@ const handleEnroll = async (method) => {
                 <div className="grid grid-cols-2 gap-5">
                   <div className="col-span-2">
                     <label className="label">Course Title</label>
-                    <input value={courseFormEdit.title} onChange={(e) => setCourseFormEdit({ ...courseFormEdit, title: e.target.value })} className="input bg-white" required />
+                    <input
+                      value={courseFormEdit.title}
+                      onChange={(e) => setCourseFormEdit({ ...courseFormEdit, title: e.target.value })}
+                      className="input bg-white"
+                      minLength={COURSE_TITLE_MIN}
+                      maxLength={COURSE_TITLE_MAX}
+                      required
+                    />
                   </div>
                   <div className="col-span-2">
                     <label className="label">Description</label>
                     <textarea value={courseFormEdit.description} onChange={(e) => setCourseFormEdit({ ...courseFormEdit, description: e.target.value })} className="input bg-white resize-none h-28" required />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="label">Course Features <span className="text-neutral-400 text-xs font-normal">(optional)</span></label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        value={courseFeatureInput}
+                        onChange={(e) => setCourseFeatureInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCourseFeature();
+                          }
+                        }}
+                        className="input bg-white"
+                        placeholder="Add a feature (e.g. Weekly practice worksheets)"
+                        maxLength={COURSE_FEATURE_TEXT_MAX}
+                      />
+                      <button type="button" onClick={handleAddCourseFeature} className="btn-secondary px-4 py-2">Add</button>
+                    </div>
+                    {courseFormEdit.features?.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {courseFormEdit.features.map((feature) => (
+                          <span key={feature} className="inline-flex items-center gap-2 bg-primary-50 text-primary-700 text-xs font-medium px-3 py-1.5 rounded-full border border-primary-100">
+                            <span className="break-words">{feature}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCourseFeature(feature)}
+                              className="text-primary-500 hover:text-primary-700"
+                            >
+                              x
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="label">Level</label>

@@ -1,5 +1,8 @@
 const db = require('../config/db');
 
+// Columns permitted in the generic update() call.
+const ALLOWED_LESSON_COLUMNS = new Set(['title', 'description', 'zoom_link', 'scheduled_at', 'duration_minutes', 'is_completed', 'module_id']);
+
 class LessonModel {
   static async findUpcomingForStudent(student_id) {
     const query = `
@@ -63,7 +66,8 @@ class LessonModel {
   }
 
   static async update(id, data) {
-    const keys = Object.keys(data);
+    // Whitelist columns — prevents SQL injection via crafted key names
+    const keys = Object.keys(data).filter(k => ALLOWED_LESSON_COLUMNS.has(k));
     if (keys.length === 0) return null;
 
     const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');

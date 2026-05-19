@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
 class CourseModel {
-  static async findAll({ level }) {
+  static async findAll({ level } = {}) {
     let query = `
       SELECT c.*, u.name as teacher_name, u.avatar_url as teacher_avatar,
         COUNT(DISTINCT e.id) as enrolled_count
@@ -38,15 +38,15 @@ class CourseModel {
   static async create(data) {
     const {
       title, level, description, short_description, price_inr, price_usd,
-      duration_weeks, max_students, teacher_id, thumbnail_url
+      duration_weeks, max_students, teacher_id, thumbnail_url, features
     } = data;
     
     const query = `
       INSERT INTO courses (
         title, level, description, short_description, price_inr, price_usd,
-        duration_weeks, max_students, teacher_id, thumbnail_url
+        duration_weeks, max_students, teacher_id, thumbnail_url, features
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
     const values = [
@@ -59,7 +59,8 @@ class CourseModel {
       duration_weeks || 8, 
       max_students || 20, 
       teacher_id, 
-      thumbnail_url || null
+      thumbnail_url || null,
+      features ?? []
     ];
     
     const result = await db.query(query, values);
@@ -67,26 +68,23 @@ class CourseModel {
   }
 
   static async update(id, data) {
-    const {
-      title, description, short_description, price_inr, price_usd,
-      duration_weeks, max_students, thumbnail_url, is_active
-    } = data;
+    // Build a partial SET clause using only the keys present in data.
+    // We do NOT use COALESCE because it silently ignores null/0/false,
+    // making it impossible to set price_inr=0 or thumbnail_url=null intentionally.
+    const ALLOWED_COURSE_COLUMNS = new Set([
+      'title', 'description', 'short_description', 'price_inr', 'price_usd',
+      'duration_weeks', 'max_students', 'thumbnail_url', 'features', 'is_active'
+    ]);
+
+    const keys = Object.keys(data).filter(k => ALLOWED_COURSE_COLUMNS.has(k));
+    if (keys.length === 0) return null;
+
+    const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
+    const values = keys.map(key => data[key]);
 
     const result = await db.query(
-      `UPDATE courses SET
-        title = COALESCE($1, title),
-        description = COALESCE($2, description),
-        short_description = COALESCE($3, short_description),
-        price_inr = COALESCE($4, price_inr),
-        price_usd = COALESCE($5, price_usd),
-        duration_weeks = COALESCE($6, duration_weeks),
-        max_students = COALESCE($7, max_students),
-        thumbnail_url = COALESCE($8, thumbnail_url),
-        is_active = COALESCE($9, is_active),
-        updated_at = NOW()
-       WHERE id = $10 RETURNING *`,
-      [title, description, short_description, price_inr, price_usd, 
-       duration_weeks, max_students, thumbnail_url, is_active, id]
+      `UPDATE courses SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [id, ...values]
     );
     return result.rows[0];
   }

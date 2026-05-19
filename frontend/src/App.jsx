@@ -18,6 +18,8 @@ import Register from "./features/auth/pages/Register";
 import StudentDashboard from "./features/dashboard/pages/StudentDashboard";
 import TeacherDashboard from "./features/dashboard/pages/TeacherDashboard";
 import AdminDashboard from "./features/dashboard/pages/AdminDashboard";
+import StripeCheckout from "./features/payment/pages/StripeCheckout";
+import RazorpayCheckout from "./features/payment/pages/RazorpayCheckout";
 
 const DashboardRedirect = () => {
   const { user } = useAuth();
@@ -81,6 +83,24 @@ const App = () => {
             element={
               <ProtectedRoute roles={["admin"]}>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          {/* Stripe checkout — protected, for logged-in students only */}
+          <Route
+            path="/checkout/stripe"
+            element={
+              <ProtectedRoute roles={["student"]}>
+                <StripeCheckout />
+              </ProtectedRoute>
+            }
+          />
+          {/* Razorpay checkout — protected, for logged-in students only */}
+          <Route
+            path="/checkout/razorpay"
+            element={
+              <ProtectedRoute roles={["student"]}>
+                <RazorpayCheckout />
               </ProtectedRoute>
             }
           />

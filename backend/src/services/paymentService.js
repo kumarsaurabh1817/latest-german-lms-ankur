@@ -1,26 +1,54 @@
 const Razorpay = require('razorpay');
 const Stripe = require('stripe');
 const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
 const PaymentModel = require('../models/paymentModel');
 const CourseModel = require('../models/courseModel');
 const EnrollmentModel = require('../models/enrollmentModel');
 const db = require('../config/db');
 
+/**
+ * Returns a short receipt ID that fits within Razorpay's 40-character limit.
+ * Format: "rcpt_<first8charsOfUUID>" = 13 chars total — well within limit.
+ */
+const generateReceipt = () => `rcpt_${uuidv4().replace(/-/g, '').slice(0, 12)}`;
+
 const getRazorpay = () => {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-        throw new Error('Razorpay is not configured');
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keyId || !keySecret || keyId.includes('TEMP_REPLACE_ME') || keySecret.includes('TEMP_REPLACE_ME')) {
+        const err = new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to your .env file.');
+        err.statusCode = 503;
+        throw err;
     }
-    return new Razorpay({
-        key_id: process.env.RAZORPAY_KEY_ID,
-        key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
+    return new Razorpay({ key_id: keyId, key_secret: keySecret });
 };
 
 const getStripe = () => {
-    if (!process.env.STRIPE_SECRET_KEY) {
-        throw new Error('Stripe is not configured');
+    const secretKey = process.env.STRIPE_SECRET_KEY;
+    if (!secretKey || secretKey.includes('TEMP_REPLACE_ME')) {
+        const err = new Error('Stripe is not configured. Please add STRIPE_SECRET_KEY to your .env file.');
+        err.statusCode = 503;
+        throw err;
     }
-    return Stripe(process.env.STRIPE_SECRET_KEY);
+    return Stripe(secretKey);
+};
+
+/**
+ * Normalize errors thrown by the Razorpay SDK.
+ * The SDK throws plain objects like: { statusCode: 401, error: { code, description } }
+ * — these are NOT standard Error instances and have no .message property.
+ * We convert them to proper Error objects and always use HTTP 502 (Bad Gateway)
+ * so the frontend's auth:unauthorized interceptor (which only watches 401) is never triggered.
+ */
+const normalizeRazorpayError = (rzpErr) => {
+    const description =
+        rzpErr?.error?.description ||
+        rzpErr?.message ||
+        'Unknown Razorpay error. Please check your API keys and try again.';
+    const normalized = new Error(`Payment gateway error: ${description}`);
+    normalized.statusCode = 502; // Bad Gateway — never 401
+    return normalized;
 };
 
 const createRazorpayOrder = async (userId, courseId) => {
@@ -30,21 +58,32 @@ const createRazorpayOrder = async (userId, courseId) => {
         err.statusCode = 404;
         throw err;
     }
-
-    const amount = Math.round(course.price_inr * 100);
-    const razorpay = getRazorpay();
-
-    if (process.env.RAZORPAY_KEY_ID.includes('your_')) {
-        const err = new Error('Razorpay is currently not configured.');
-        err.statusCode = 503;
+    if (!course.is_active) {
+        const err = new Error('This course is no longer available for enrollment');
+        err.statusCode = 403;
         throw err;
     }
 
-    const order = await razorpay.orders.create({
-        amount,
-        currency: 'INR',
-        receipt: `order_${Date.now()}`,
-    });
+    // getRazorpay() throws 503 if credentials are missing/placeholder
+    const razorpay = getRazorpay();
+    const amount = Math.round(course.price_inr * 100);
+
+    let order;
+    try {
+        order = await razorpay.orders.create({
+            amount,
+            currency: 'INR',
+            // receipt must be ≤ 40 chars — generateReceipt() produces 17 chars
+            receipt: generateReceipt(),
+            notes: {
+                course_id: String(courseId),
+                student_id: String(userId),
+                course_title: course.title,
+            },
+        });
+    } catch (rzpErr) {
+        throw normalizeRazorpayError(rzpErr);
+    }
 
     const payment = await PaymentModel.create({
         student_id: userId,
@@ -74,9 +113,17 @@ const createRazorpayOrder = async (userId, courseId) => {
  * 5. Update payment + create enrollment in a single DB transaction.
  */
 const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature }) => {
-    // Step 1: Verify HMAC signature
+    // Guard: secret must be present before we attempt HMAC
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret || keySecret.includes('TEMP_REPLACE_ME')) {
+        const err = new Error('Razorpay is not configured. Please add RAZORPAY_KEY_SECRET to your .env file.');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    // Step 1: Verify HMAC-SHA256 signature
     const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .createHmac('sha256', keySecret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
@@ -140,15 +187,15 @@ const createStripeIntent = async (userId, courseId) => {
         err.statusCode = 404;
         throw err;
     }
-
-    const amount = Math.round(course.price_usd * 100);
-    const stripe = getStripe();
-
-    if (process.env.STRIPE_SECRET_KEY.includes('your_')) {
-        const err = new Error('Stripe payments are currently not configured.');
-        err.statusCode = 503;
+    if (!course.is_active) {
+        const err = new Error('This course is no longer available for enrollment');
+        err.statusCode = 403;
         throw err;
     }
+
+    const amount = Math.round(course.price_usd * 100);
+    // getStripe() throws 503 if not configured
+    const stripe = getStripe();
 
     const intent = await stripe.paymentIntents.create({
         amount,
@@ -234,6 +281,183 @@ const confirmStripePayment = async (userId, { payment_intent_id }) => {
     return { success: true, message: 'Payment confirmed and enrollment completed' };
 };
 
+/**
+ * Stripe Webhook handler:
+ * Verifies the Stripe-Signature header, processes payment_intent.succeeded events,
+ * and enrolls the student atomically.
+ *
+ * This is an async safety net — if the client-side confirm call fails or the
+ * user closes the tab, the webhook will still complete the enrollment.
+ */
+const handleStripeWebhook = async (rawBody, signature) => {
+    // Respect the ENABLE_STRIPE_WEBHOOK toggle from .env
+    if (process.env.ENABLE_STRIPE_WEBHOOK !== 'true') {
+        // Should never reach here because app.js guards the route,
+        // but defensive check in case the handler is called directly.
+        const err = new Error('Stripe webhook is disabled. Set ENABLE_STRIPE_WEBHOOK=true in .env to enable.');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret || webhookSecret.includes('TEMP_REPLACE_ME')) {
+        const err = new Error('Stripe webhook secret is not configured. Set STRIPE_WEBHOOK_SECRET in .env.');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    const stripe = getStripe();
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(
+            rawBody,
+            signature,
+            webhookSecret
+        );
+    } catch (err) {
+        const e = new Error(`Stripe webhook signature verification failed: ${err.message}`);
+        e.statusCode = 400;
+        throw e;
+    }
+
+    if (event.type === 'payment_intent.succeeded') {
+        const intent = event.data.object;
+
+        // Fetch payment record by intent ID
+        const payment = await PaymentModel.findByOrderId(intent.id);
+        if (!payment) {
+            // Payment might not exist yet (edge case) — log and return OK so Stripe stops retrying
+            console.warn(`[StripeWebhook] No payment record found for intent ${intent.id}`);
+            return { received: true };
+        }
+
+        // Skip if already processed (idempotency)
+        if (payment.status === 'completed') {
+            return { received: true };
+        }
+
+        // Atomic update + enrollment
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query(
+                `UPDATE payments SET status = 'completed', external_payment_id = $1, updated_at = NOW() WHERE id = $2`,
+                [intent.id, payment.id]
+            );
+            await client.query(
+                `INSERT INTO enrollments (student_id, course_id, payment_id)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (student_id, course_id) DO NOTHING`,
+                [payment.student_id, payment.course_id, payment.id]
+            );
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
+    }
+
+    return { received: true };
+};
+
+/**
+ * Razorpay Webhook handler:
+ * Verifies the Razorpay-Signature header using HMAC-SHA256,
+ * processes payment.captured events, and enrolls the student atomically.
+ *
+ * This is an async safety net — if the client-side verify call fails or the
+ * user closes the tab before verification, the webhook will still complete enrollment.
+ *
+ * Register this webhook in the Razorpay Dashboard:
+ *   URL: https://yourdomain.com/api/payments/razorpay/webhook
+ *   Events: payment.captured
+ */
+const handleRazorpayWebhook = async (rawBody, signature) => {
+    // Respect the ENABLE_RAZORPAY_WEBHOOK toggle from .env
+    if (process.env.ENABLE_RAZORPAY_WEBHOOK !== 'true') {
+        // Should never reach here because app.js guards the route,
+        // but defensive check in case the handler is called directly.
+        const err = new Error('Razorpay webhook is disabled. Set ENABLE_RAZORPAY_WEBHOOK=true in .env to enable.');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (!webhookSecret || webhookSecret.includes('TEMP_REPLACE_ME')) {
+        const err = new Error('Razorpay webhook secret is not configured. Set RAZORPAY_WEBHOOK_SECRET in .env.');
+        err.statusCode = 503;
+        throw err;
+    }
+
+    // Verify HMAC-SHA256 signature
+    const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(rawBody)
+        .digest('hex');
+
+    if (expectedSignature !== signature) {
+        const err = new Error('Razorpay webhook signature verification failed');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    let event;
+    try {
+        event = JSON.parse(rawBody);
+    } catch {
+        const err = new Error('Invalid Razorpay webhook payload');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (event.event === 'payment.captured') {
+        const rzpPayment = event.payload?.payment?.entity;
+        if (!rzpPayment) return { received: true };
+
+        const rzpOrderId = rzpPayment.order_id;
+        if (!rzpOrderId) return { received: true };
+
+        // Fetch payment record by the order ID
+        const payment = await PaymentModel.findByOrderId(rzpOrderId);
+        if (!payment) {
+            console.warn(`[RazorpayWebhook] No payment record found for order ${rzpOrderId}`);
+            return { received: true };
+        }
+
+        // Skip if already processed (idempotency)
+        if (payment.status === 'completed') {
+            return { received: true };
+        }
+
+        // Atomic update + enrollment
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query(
+                `UPDATE payments SET status = 'completed', external_payment_id = $1, updated_at = NOW() WHERE id = $2`,
+                [rzpPayment.id, payment.id]
+            );
+            await client.query(
+                `INSERT INTO enrollments (student_id, course_id, payment_id)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (student_id, course_id) DO NOTHING`,
+                [payment.student_id, payment.course_id, payment.id]
+            );
+            await client.query('COMMIT');
+        } catch (txErr) {
+            await client.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            client.release();
+        }
+    }
+
+    return { received: true };
+};
+
 const getMyPayments = async (userId) => {
     return await PaymentModel.findByUser(userId);
 };
@@ -243,5 +467,7 @@ module.exports = {
     verifyRazorpayPayment,
     createStripeIntent,
     confirmStripePayment,
+    handleStripeWebhook,
+    handleRazorpayWebhook,
     getMyPayments
 };

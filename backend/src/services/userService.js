@@ -43,7 +43,7 @@ const updateUserRole = async (userId, role) => {
     throw makeError('Invalid role', 400);
   }
 
-  const updatedUser = await UserModel.update(userId, { role });
+  const updatedUser = await UserModel.updateRole(userId, role);
   if (!updatedUser) {
     throw makeError('User not found', 404);
   }

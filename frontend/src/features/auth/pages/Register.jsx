@@ -19,8 +19,8 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
     setLoading(true);
@@ -29,7 +29,7 @@ const Register = () => {
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const errorData = err.response?.data;
-      const errorMessage = errorData?.message || errorData?.error || (Array.isArray(errorData?.errors) ? errorData.errors.join(', ') : 'Registration failed. Please try again.');
+      const errorMessage = errorData?.message || errorData?.error || (Array.isArray(errorData?.errors) ? errorData.errors[0]?.message : 'Registration failed. Please try again.');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -65,7 +65,7 @@ const Register = () => {
             </div>
             <div>
               <label className="label">Password</label>
-              <input type="password" name="password" value={form.password} onChange={handleChange} className="input" placeholder="Min. 6 characters" required />
+              <input type="password" name="password" value={form.password} onChange={handleChange} className="input" placeholder="Min. 8 characters" required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>

@@ -60,10 +60,44 @@ CREATE TABLE IF NOT EXISTS courses (
   max_students INTEGER DEFAULT 20,
   teacher_id UUID REFERENCES users(id) ON DELETE SET NULL,
   thumbnail_url TEXT,
+  features TEXT[],
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE courses
+  ADD COLUMN IF NOT EXISTS features TEXT[];
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'courses'
+      AND column_name = 'features'
+      AND data_type IN ('json', 'jsonb')
+  ) THEN
+    ALTER TABLE courses
+      ADD COLUMN IF NOT EXISTS features_text TEXT[];
+
+    UPDATE courses
+      SET features_text = CASE
+        WHEN features IS NULL THEN NULL
+        WHEN jsonb_typeof(features::jsonb) = 'array' THEN (
+          SELECT array_agg(value)
+          FROM jsonb_array_elements_text(features::jsonb) AS value
+        )
+        ELSE NULL
+      END;
+
+    ALTER TABLE courses
+      DROP COLUMN features;
+
+    ALTER TABLE courses
+      RENAME COLUMN features_text TO features;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS modules (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

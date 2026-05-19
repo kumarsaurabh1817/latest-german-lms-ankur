@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const { authenticate, requireRole, requireApprovedTeacher } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+const { courseSchema, courseUpdateSchema } = require('../validators/courseValidator');
 const {
   getAllCourses,
   getCourseById,
@@ -18,8 +20,8 @@ router.get('/:id/modules', getCourseModules);
 router.post('/:id/modules', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, createModule);
 router.put('/:id/modules/:moduleId', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, updateModule);
 router.delete('/:id/modules/:moduleId', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, deleteModule);
-router.post('/', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, createCourse);
-router.put('/:id', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, updateCourse);
+router.post('/', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, validate(courseSchema), createCourse);
+router.put('/:id', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, validate(courseUpdateSchema), updateCourse);
 router.delete('/:id', authenticate, requireRole('teacher', 'admin'), requireApprovedTeacher, deleteCourse);
 
 module.exports = router;

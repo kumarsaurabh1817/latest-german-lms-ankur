@@ -5,6 +5,9 @@ import api from '../../../utils/api';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 
 const tabs = ['My Courses', 'Create Course', 'Upcoming Classes'];
+const COURSE_TITLE_MIN = 5;
+const COURSE_TITLE_MAX = 120;
+const COURSE_FEATURE_TEXT_MAX = 80;
 
 const formatDate = (dt) =>
   new Date(dt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
@@ -34,11 +37,30 @@ const TeacherDashboard = () => {
       console.error('Failed to load modules', err);
     }
   };
-  const [courseForm, setCourseForm] = useState({ title: '', level: 'A1', description: '', price_inr: 0, price_usd: 0, duration_weeks: 8, thumbnail_url: '' });
+  const [courseForm, setCourseForm] = useState({ title: '', level: 'A1', description: '', price_inr: 0, price_usd: 0, duration_weeks: 8, thumbnail_url: '', features: [] });
+  const [courseFeatureInput, setCourseFeatureInput] = useState('');
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [courseMsg, setCourseMsg] = useState('');
   const [scheduling, setScheduling] = useState(false);
   const [scheduleMsg, setScheduleMsg] = useState('');
+
+  const handleAddCourseFeature = () => {
+    const value = courseFeatureInput.trim();
+    if (!value) return;
+    setCourseForm((prev) => {
+      const exists = prev.features.some((feature) => feature.toLowerCase() === value.toLowerCase());
+      if (exists) return prev;
+      return { ...prev, features: [...prev.features, value] };
+    });
+    setCourseFeatureInput('');
+  };
+
+  const handleRemoveCourseFeature = (featureToRemove) => {
+    setCourseForm((prev) => ({
+      ...prev,
+      features: prev.features.filter((feature) => feature !== featureToRemove),
+    }));
+  };
 
   useEffect(() => {
     Promise.all([api.get('/courses'), api.get('/lessons/upcoming')])
@@ -63,12 +85,17 @@ const TeacherDashboard = () => {
     }
 
     // Frontend validation
-    if (!courseForm.title.trim()) {
+    const trimmedTitle = courseForm.title.trim();
+    if (!trimmedTitle) {
       setCourseMsg('Course title is required.');
       return;
     }
-    if (courseForm.title.trim().length < 5) {
-      setCourseMsg('Course title must be at least 5 characters.');
+    if (trimmedTitle.length < COURSE_TITLE_MIN) {
+      setCourseMsg(`Course title must be at least ${COURSE_TITLE_MIN} characters.`);
+      return;
+    }
+    if (trimmedTitle.length > COURSE_TITLE_MAX) {
+      setCourseMsg(`Course title must be ${COURSE_TITLE_MAX} characters or fewer.`);
       return;
     }
     if (!courseForm.level) {
@@ -97,7 +124,8 @@ const TeacherDashboard = () => {
     try {
       await api.post('/courses', { ...courseForm, teacher_id: user.id });
       setCourseMsg('Course created successfully!');
-      setCourseForm({ title: '', level: 'A1', description: '', price_inr: 0, price_usd: 0, duration_weeks: 8, thumbnail_url: '' });
+      setCourseForm({ title: '', level: 'A1', description: '', price_inr: 0, price_usd: 0, duration_weeks: 8, thumbnail_url: '', features: [] });
+      setCourseFeatureInput('');
       const { data } = await api.get('/courses');
       const allCourses = data.data || [];
       setCourses(allCourses.filter((co) => co.teacher_id === user.id));
@@ -208,8 +236,9 @@ const TeacherDashboard = () => {
                             value={courseForm.title}
                             onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
                             className="input"
-                            placeholder="e.g. Intensive German B1 (min. 5 characters)"
-                            minLength={5}
+                            placeholder={`e.g. Intensive German B1 (${COURSE_TITLE_MIN}-${COURSE_TITLE_MAX} characters)`}
+                            minLength={COURSE_TITLE_MIN}
+                            maxLength={COURSE_TITLE_MAX}
                             required
                           />
                       </div>
@@ -233,9 +262,42 @@ const TeacherDashboard = () => {
                             minLength={20}
                             required
                           />
-                          <p className="text-xs text-neutral-500 mt-2">
-                            Note: This course will automatically include features like live lessons and scheduled Zoom classes.
-                          </p>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="label">Course Features <span className="text-neutral-400 text-xs font-normal">(optional)</span></label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            value={courseFeatureInput}
+                            onChange={(e) => setCourseFeatureInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddCourseFeature();
+                              }
+                            }}
+                            className="input"
+                            placeholder="Add a feature (e.g. Weekly practice worksheets)"
+                            maxLength={COURSE_FEATURE_TEXT_MAX}
+                          />
+                          <button type="button" onClick={handleAddCourseFeature} className="btn-secondary px-4 py-2">Add</button>
+                        </div>
+                        {courseForm.features.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {courseForm.features.map((feature) => (
+                              <span key={feature} className="inline-flex items-center gap-2 bg-primary-50 text-primary-700 text-xs font-medium px-3 py-1.5 rounded-full border border-primary-100">
+                                <span className="break-words">{feature}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCourseFeature(feature)}
+                                  className="text-primary-500 hover:text-primary-700"
+                                >
+                                  x
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-neutral-500 mt-2">Add course highlights shown to students on the course page.</p>
                       </div>
                       <div>
                           <label className="label">Price (INR) <span className="text-red-500">*</span></label>

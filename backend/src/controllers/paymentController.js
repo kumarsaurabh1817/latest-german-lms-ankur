@@ -46,6 +46,48 @@ const confirmStripePayment = async (req, res, next) => {
   }
 };
 
+/**
+ * Stripe Webhook endpoint — called by Stripe's servers asynchronously.
+ * Receives a raw Buffer body (registered BEFORE express.json() in app.js).
+ * Validates the Stripe-Signature header to prevent spoofed events.
+ */
+const stripeWebhook = async (req, res, next) => {
+  const signature = req.headers['stripe-signature'];
+  if (!signature) {
+    return res.status(400).json({ success: false, message: 'Missing Stripe-Signature header' });
+  }
+  try {
+    // req.body is a raw Buffer here (express.raw middleware applied in app.js)
+    const result = await paymentService.handleStripeWebhook(req.body, signature);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Razorpay Webhook endpoint — called by Razorpay's servers asynchronously.
+ * Receives a raw Buffer/string body (registered BEFORE express.json() in app.js).
+ * Validates the X-Razorpay-Signature header using HMAC-SHA256 to prevent spoofed events.
+ *
+ * Register this URL in your Razorpay Dashboard:
+ *   Webhooks → Add New Webhook → https://yourdomain.com/api/payments/razorpay/webhook
+ *   Events to subscribe: payment.captured
+ */
+const razorpayWebhook = async (req, res, next) => {
+  const signature = req.headers['x-razorpay-signature'];
+  if (!signature) {
+    return res.status(400).json({ success: false, message: 'Missing X-Razorpay-Signature header' });
+  }
+  try {
+    // req.body is a raw Buffer here (express.raw middleware applied in app.js)
+    const result = await paymentService.handleRazorpayWebhook(req.body, signature);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getMyPayments = async (req, res, next) => {
   try {
     const payments = await paymentService.getMyPayments(req.user.id);
@@ -60,5 +102,8 @@ module.exports = {
   verifyRazorpayPayment,
   createStripeIntent,
   confirmStripePayment,
+  stripeWebhook,
+  razorpayWebhook,
   getMyPayments
 };
+

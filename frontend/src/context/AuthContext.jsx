@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import AuthService from '../features/auth/services/authService';
-import { setAuthToken } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -10,35 +9,43 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        setAuthToken(token);
-        try {
-          const res = await AuthService.getMe();
-          if (res.success) {
-            setUser(res.user);
-          } else {
-             setAuthToken(null);
-          }
-        } catch (error) {
-          void error;
-          // Token invalid
-          setAuthToken(null);
+      try {
+        const res = await AuthService.getMe();
+        if (res.success) {
+          setUser(res.user);
         }
+      } catch (error) {
+        void error;
       }
       setLoading(false);
     };
     initAuth();
 
     // Listen for 401 responses dispatched by the API interceptor
+    const PUBLIC_PATHS = ['/login', '/register', '/'];
+    // Checkout pages: don't redirect — the payment itself may get a 401
+    const CHECKOUT_PATHS = ['/checkout/'];
+    let redirectTimeout = null;
     const handleUnauthorized = () => {
       setUser(null);
-      setAuthToken(null);
-      // Navigate to login without full reload — router will handle this
-      window.location.replace('/login');
+      const path = window.location.pathname;
+      const isPublic = PUBLIC_PATHS.some(p => path === p || path.startsWith('/courses'));
+      const isCheckout = CHECKOUT_PATHS.some(p => path.startsWith(p));
+      if (!isPublic && !isCheckout) {
+        // Debounce: avoid firing multiple redirects from parallel 401 responses
+        if (!redirectTimeout) {
+          redirectTimeout = setTimeout(() => {
+            window.location.replace('/login');
+            redirectTimeout = null;
+          }, 200);
+        }
+      }
     };
     window.addEventListener('auth:unauthorized', handleUnauthorized);
-    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+      if (redirectTimeout) clearTimeout(redirectTimeout);
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -59,8 +66,8 @@ export const AuthProvider = ({ children }) => {
     throw new Error(res.message || 'Registration failed');
   };
 
-  const logout = () => {
-    AuthService.logout();
+  const logout = async () => {
+    await AuthService.logout();
     setUser(null);
   };
 

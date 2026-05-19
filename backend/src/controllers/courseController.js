@@ -1,9 +1,12 @@
 const CourseService = require('../services/courseService');
-const { courseSchema } = require('../validators/courseValidator');
-const { ZodError } = require('zod');
 
 exports.getAllCourses = async (req, res, next) => {
   try {
+    const { level } = req.query;
+    const VALID_LEVELS = ['A1', 'A2', 'B1', 'B2'];
+    if (level && !VALID_LEVELS.includes(level)) {
+      return res.status(400).json({ success: false, message: `Invalid level. Must be one of: ${VALID_LEVELS.join(', ')}` });
+    }
     const courses = await CourseService.listCourses(req.query);
     res.json({ success: true, data: courses });
   } catch (err) {
@@ -31,13 +34,9 @@ exports.getCourseModules = async (req, res, next) => {
 
 exports.createCourse = async (req, res, next) => {
   try {
-    const validatedData = courseSchema.parse(req.body);
-    const course = await CourseService.createCourse(validatedData, req.user);
+    const course = await CourseService.createCourse(req.body, req.user);
     res.status(201).json({ success: true, data: course });
   } catch (err) {
-    if (err instanceof ZodError) {
-      return res.status(400).json({ success: false, errors: err.errors });
-    }
     next(err);
   }
 };
