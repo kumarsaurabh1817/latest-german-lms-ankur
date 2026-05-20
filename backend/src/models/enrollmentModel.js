@@ -28,6 +28,14 @@ class EnrollmentModel {
     return result.rows;
   }
 
+  static async findByStudentAndCourse(student_id, course_id) {
+    const result = await db.query(
+      `SELECT id FROM enrollments WHERE student_id = $1 AND course_id = $2 AND is_active = true LIMIT 1`,
+      [student_id, course_id]
+    );
+    return result.rows[0]; // undefined if not enrolled
+  }
+
   static async getEnrolledStudents(course_id) {
     const result = await db.query(
       `SELECT u.id, u.name, u.email, u.phone, u.country, e.enrolled_at

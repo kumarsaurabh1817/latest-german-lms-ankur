@@ -64,6 +64,14 @@ const createRazorpayOrder = async (userId, courseId) => {
         throw err;
     }
 
+    // Enrollment pre-check — block duplicate orders for already-enrolled students
+    const existingEnrollment = await EnrollmentModel.findByStudentAndCourse(userId, courseId);
+    if (existingEnrollment) {
+        const err = new Error('You are already enrolled in this course');
+        err.statusCode = 409;
+        throw err;
+    }
+
     // getRazorpay() throws 503 if credentials are missing/placeholder
     const razorpay = getRazorpay();
     const amount = Math.round(course.price_inr * 100);
@@ -122,12 +130,17 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
     }
 
     // Step 1: Verify HMAC-SHA256 signature
+    // Use timingSafeEqual to prevent timing-attack signature guessing.
     const expectedSignature = crypto
         .createHmac('sha256', keySecret)
         .update(`${razorpay_order_id}|${razorpay_payment_id}`)
         .digest('hex');
 
-    if (expectedSignature !== razorpay_signature) {
+    const signaturesMatch = crypto.timingSafeEqual(
+        Buffer.from(expectedSignature, 'hex'),
+        Buffer.from(razorpay_signature, 'hex')
+    );
+    if (!signaturesMatch) {
         const err = new Error('Payment signature verification failed');
         err.statusCode = 400;
         throw err;
@@ -393,12 +406,17 @@ const handleRazorpayWebhook = async (rawBody, signature) => {
     }
 
     // Verify HMAC-SHA256 signature
+    // Use timingSafeEqual to prevent timing-attack signature guessing.
     const expectedSignature = crypto
         .createHmac('sha256', webhookSecret)
         .update(rawBody)
         .digest('hex');
 
-    if (expectedSignature !== signature) {
+    const webhookSigMatch = crypto.timingSafeEqual(
+        Buffer.from(expectedSignature, 'hex'),
+        Buffer.from(signature, 'hex')
+    );
+    if (!webhookSigMatch) {
         const err = new Error('Razorpay webhook signature verification failed');
         err.statusCode = 400;
         throw err;
