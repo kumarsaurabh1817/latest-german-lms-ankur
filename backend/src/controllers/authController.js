@@ -1,15 +1,29 @@
 const AuthService = require('../services/authService');
 
+const buildCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+  };
+};
+
+const buildClearCookieOptions = () => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'None' : 'Lax'
+  };
+};
+
 const register = async (req, res, next) => {
   try {
     const { user, token } = await AuthService.register(req.body);
     
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    };
+    const cookieOptions = buildCookieOptions();
     
     res.status(201)
       .cookie('token', token, cookieOptions)
@@ -27,12 +41,7 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
     const { user, token } = await AuthService.login(email, password);
     
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    };
+    const cookieOptions = buildCookieOptions();
 
     res.cookie('token', token, cookieOptions).json({ 
       success: true, 
@@ -53,11 +62,7 @@ const getMe = async (req, res, next) => {
 };
 
 const logout = (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Strict'
-  });
+  res.clearCookie('token', buildClearCookieOptions());
   res.json({ success: true, message: 'Logged out successfully' });
 };
 
