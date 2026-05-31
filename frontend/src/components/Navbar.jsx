@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logoMark from '../assets/imagelogo.jpeg';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -65,11 +66,15 @@ const Navbar = () => {
     >
       <div className="container-pad">
         <div className="flex items-center justify-between h-16">
-          <Link to={isAdmin ? '/dashboard/admin' : '/'} className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center shadow-sm group-hover:bg-primary-700 transition-colors">
-              <span className="text-white font-bold text-sm">DL</span>
-            </div>
-            <span className="font-display font-bold text-neutral-900 text-lg">DeutschLernen</span>
+          <Link to={isAdmin ? '/dashboard/admin' : '/'} className="flex items-center gap-3 group">
+            <img
+              src={logoMark}
+              alt="Gurukul German logo"
+              className="w-9 h-9 sm:w-10 sm:h-10 object-contain"
+            />
+            <span className="font-display font-bold text-neutral-900 text-base sm:text-lg">
+              Gurukul German
+            </span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

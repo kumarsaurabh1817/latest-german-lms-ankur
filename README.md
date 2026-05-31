@@ -1,4 +1,4 @@
-# German LMS (DeutschLernen)
+# German LMS (Gurukul German)
 
 Full stack learning management system for German language courses. The project includes a Node.js/Express API with PostgreSQL, and a React + Vite frontend with Stripe and Razorpay payments.
 

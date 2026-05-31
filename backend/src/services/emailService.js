@@ -10,7 +10,7 @@
  *   EMAIL_USER=you@gmail.com    # SMTP username / sender address
  *   EMAIL_PASS=xxxx xxxx xxxx   # Gmail App Password (NOT your account password)
  *   ADMIN_EMAIL=admin@yourdomain.com  # where admin notifications are delivered
- *   EMAIL_FROM="DeutschLernen <no-reply@yourdomain.com>"  # "From" display name
+ *   EMAIL_FROM="Gurukul German <no-reply@yourdomain.com>"  # "From" display name
  *
  * Gmail App Password:
  *   Google Account → Security → 2-Step Verification → App passwords
@@ -100,7 +100,7 @@ const sendConsultationAdminNotification = async ({ name, email, phone, country, 
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 24px; border-radius: 12px;">
         <div style="background: #111827; padding: 24px; border-radius: 10px 10px 0 0; text-align: center;">
           <h1 style="color: #fff; margin: 0; font-size: 22px;">New Consultation Request</h1>
-          <p style="color: #9ca3af; margin: 6px 0 0;">DeutschLernen — German Language Platform</p>
+          <p style="color: #9ca3af; margin: 6px 0 0;">Gurukul German — German Language Platform</p>
         </div>
 
         <div style="background: #fff; padding: 28px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb;">
@@ -172,7 +172,7 @@ const sendContactAdminNotification = async ({ name, email, subject, message }) =
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #f9fafb; padding: 24px; border-radius: 12px;">
         <div style="background: #111827; padding: 24px; border-radius: 10px 10px 0 0; text-align: center;">
           <h1 style="color: #fff; margin: 0; font-size: 22px;">New Contact Message</h1>
-          <p style="color: #9ca3af; margin: 6px 0 0;">DeutschLernen — German Language Platform</p>
+          <p style="color: #9ca3af; margin: 6px 0 0;">Gurukul German — German Language Platform</p>
         </div>
 
         <div style="background: #fff; padding: 28px; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb;">

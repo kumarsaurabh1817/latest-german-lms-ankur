@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { loadScript } from '../../../utils/loadScript';
 import { useAuth } from '../../../context/AuthContext';
 import LoadingSpinner from '../../../components/LoadingSpinner';
+import logoMark from '../../../assets/imagelogo.jpeg';
 
 /* ─── helpers ───────────────────────────────────────────────────────────────── */
 
@@ -158,9 +159,9 @@ const RazorpayCheckout = () => {
         key: razorpayKeyId || orderData.key,
         amount: orderData.amount,      // amount in paise (INR × 100)
         currency: orderData.currency,  // 'INR'
-        name: 'DeutschLernen',
+        name: 'Gurukul German',
         description: course.title,
-        image: '/favicon.ico',
+        image: logoMark,
         order_id: orderData.orderId,
 
         /**

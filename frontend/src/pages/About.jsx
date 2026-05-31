@@ -14,7 +14,7 @@ const About = () => (
   <div className="pt-16">
     <div className="bg-neutral-900 py-16">
       <div className="container-pad text-center">
-        <h1 className="text-4xl md:text-5xl font-display font-bold text-white">About DeutschLernen</h1>
+        <h1 className="text-4xl md:text-5xl font-display font-bold text-white">About Gurukul German</h1>
         <p className="mt-4 text-neutral-400 text-lg max-w-2xl mx-auto">
           We're on a mission to make quality German education accessible globally through live, interactive online teaching.
         </p>
@@ -28,7 +28,7 @@ const About = () => (
             <h2 className="section-title">Our Story</h2>
             <div className="space-y-4 mt-6 text-neutral-600 leading-relaxed">
               <p>
-                DeutschLernen was founded with a simple belief: the best way to learn a language is through
+                Gurukul German was founded with a simple belief: the best way to learn a language is through
                 live, real-time interaction with an expert teacher — not passive video watching.
               </p>
               <p>

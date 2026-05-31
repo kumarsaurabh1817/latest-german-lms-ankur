@@ -95,7 +95,7 @@ const Contact = () => {
           <div className="space-y-6">
             <h2 className="text-2xl font-display font-semibold text-neutral-900">Contact Information</h2>
             {[
-              { icon: '✉️', label: 'Email', value: 'hello@deutschlernen.com' },
+              { icon: '✉️', label: 'Email', value: 'hello@gurukulgerman.com' },
               { icon: '🕐', label: 'Response Time', value: 'Within 24 hours' },
               { icon: '🌍', label: 'Students From', value: 'Worldwide' },
               { icon: '💬', label: 'Languages', value: 'English & German' },

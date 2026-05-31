@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import LoadingSpinner from '../../../components/LoadingSpinner';
+import logoMark from '../../../assets/imagelogo.jpeg';
 
 const Login = () => {
   const { login, user } = useAuth();
@@ -38,11 +39,15 @@ const Login = () => {
     <div className="pt-16 min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-9 h-9 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">DL</span>
-            </div>
-            <span className="font-display font-bold text-neutral-900 text-xl">DeutschLernen</span>
+          <Link to="/" className="inline-flex items-center gap-3 mb-6">
+            <img
+              src={logoMark}
+              alt="Gurukul German logo"
+              className="w-12 h-12 object-contain"
+            />
+            <span className="font-display font-bold text-neutral-900 text-xl sm:text-2xl">
+              Gurukul German
+            </span>
           </Link>
           <h1 className="text-2xl font-display font-bold text-neutral-900">Welcome back</h1>
           <p className="text-neutral-500 text-sm mt-2">Sign in to access your courses and classes</p>

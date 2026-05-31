@@ -1,15 +1,14 @@
 import { Link } from 'react-router-dom';
+import logoMark from '../assets/imagelogo.jpeg';
 
 const Footer = () => (
   <footer className="bg-neutral-900 text-neutral-400">
     <div className="container-pad py-14">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
         <div className="col-span-1 md:col-span-2">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">DL</span>
-            </div>
-            <span className="font-display font-bold text-white text-lg">DeutschLernen</span>
+          <div className="flex items-center gap-3 mb-4">
+            <img src={logoMark} alt="Gurukul German logo" className="w-10 h-10 object-contain" />
+            <span className="font-display font-bold text-white text-lg">Gurukul German</span>
           </div>
           <p className="text-sm leading-relaxed max-w-sm">
             Learn German online with live instructor-led classes. Structured A1 to B2 CEFR courses
@@ -47,7 +46,7 @@ const Footer = () => (
       </div>
 
       <div className="mt-10 pt-6 border-t border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-        <p>&copy; {new Date().getFullYear()} DeutschLernen. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Gurukul German. All rights reserved.</p>
         <p>Built with live classes in mind.</p>
       </div>
     </div>
