@@ -315,6 +315,11 @@ const handleEnroll = async (method) => {
       toast.error(`Course title must be ${COURSE_TITLE_MAX} characters or fewer.`);
       return;
     }
+    const priceInr = Number(courseFormEdit.price_inr);
+    if (!Number.isFinite(priceInr) || priceInr <= 0) {
+      toast.error('Price (INR) must be greater than 0.');
+      return;
+    }
     const confirmed = await confirmAction('Save these changes to the course?');
     if (!confirmed) return;
     try {
@@ -366,6 +371,10 @@ const handleEnroll = async (method) => {
   }
 
   if (!course) return null;
+
+  const hasInrPrice = Number(course.price_inr) > 0;
+  const hasUsdPrice = Number(course.price_usd) > 0;
+  const hasPricing = hasInrPrice || hasUsdPrice;
 
   return (
     <div className="pt-16">
@@ -714,14 +723,23 @@ const handleEnroll = async (method) => {
                   className="w-full h-44 object-cover rounded-lg mb-5"
                 />
               )}
-              {!isEnrolled && !isTeacher && (
+              {!isEnrolled && !isTeacher && hasPricing && (
                 <div className="mb-4">
-                  <p className="text-3xl font-bold text-neutral-900">
-                    ₹{Number(course.price_inr).toLocaleString('en-IN')}
-                  </p>
-                  {course.price_usd > 0 && (
-                    <p className="text-neutral-500 text-sm mt-0.5">${course.price_usd} USD for international students</p>
+                  {hasInrPrice && (
+                    <p className="text-3xl font-bold text-neutral-900">
+                      ₹{Number(course.price_inr).toLocaleString('en-IN')}
+                    </p>
                   )}
+                  {hasUsdPrice && (
+                    <p className="text-neutral-500 text-sm mt-0.5">
+                      ${course.price_usd} USD{hasInrPrice ? ' for international students' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
+              {!isEnrolled && !isTeacher && !hasPricing && (
+                <div className="mb-4 text-sm text-neutral-500 bg-neutral-50 border border-neutral-200 rounded-lg p-3">
+                  Pricing is not configured for this course. Please contact support.
                 </div>
               )}
               {course.features?.length ? (
@@ -743,18 +761,20 @@ const handleEnroll = async (method) => {
                 <Link to="/dashboard/student" className="btn-secondary w-full text-center block leading-[2.5rem]">Go to Dashboard</Link>
               ) : !user ? (
                 <Link to="/login" className="btn-primary w-full text-center block leading-[2.5rem]">Login to Enroll</Link>
-              ) : user.role === 'student' ? (
+              ) : user.role === 'student' && hasPricing ? (
                 showPaymentOptions ? (
                   <div className="space-y-3 mt-4 border-t border-neutral-100 pt-4">
                     <p className="text-sm font-semibold text-neutral-700 mb-2">Select Payment Method:</p>
-                    <button
-                      className="btn-primary w-full bg-[#3395FF] hover:bg-[#2084ea] disabled:opacity-50 !py-2.5"
-                      disabled={!!enrolling}
-                      onClick={() => handleEnroll('razorpay')}
-                    >
-                      {enrolling === 'razorpay' ? <LoadingSpinner size="sm" /> : `Pay ₹${Number(course.price_inr).toLocaleString('en-IN')} (Razorpay)`}
-                    </button>
-                {course.price_usd > 0 && (
+                    {hasInrPrice && (
+                      <button
+                        className="btn-primary w-full bg-[#3395FF] hover:bg-[#2084ea] disabled:opacity-50 !py-2.5"
+                        disabled={!!enrolling}
+                        onClick={() => handleEnroll('razorpay')}
+                      >
+                        {enrolling === 'razorpay' ? <LoadingSpinner size="sm" /> : `Pay ₹${Number(course.price_inr).toLocaleString('en-IN')} (Razorpay)`}
+                      </button>
+                    )}
+                    {hasUsdPrice && (
                       <button
                         className="btn-secondary w-full border-[#635BFF] text-[#635BFF] hover:bg-slate-50 disabled:opacity-50 !py-2.5"
                         disabled={!!enrolling}
@@ -863,7 +883,7 @@ const handleEnroll = async (method) => {
                   </div>
                   <div>
                     <label className="label">Price (INR)</label>
-                    <input type="number" value={courseFormEdit.price_inr} onChange={(e) => setCourseFormEdit({ ...courseFormEdit, price_inr: parseFloat(e.target.value) })} className="input bg-white" min="0" required />
+                    <input type="number" value={courseFormEdit.price_inr} onChange={(e) => setCourseFormEdit({ ...courseFormEdit, price_inr: parseFloat(e.target.value) })} className="input bg-white" min="1" required />
                   </div>
                   <div>
                     <label className="label">Price (USD)</label>

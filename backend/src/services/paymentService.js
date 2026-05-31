@@ -64,6 +64,12 @@ const createRazorpayOrder = async (userId, courseId) => {
         throw err;
     }
 
+    if (!course.price_inr || Number(course.price_inr) <= 0) {
+        const err = new Error('Razorpay payments require a course price greater than 0 INR');
+        err.statusCode = 400;
+        throw err;
+    }
+
     // Enrollment pre-check — block duplicate orders for already-enrolled students
     const existingEnrollment = await EnrollmentModel.findByStudentAndCourse(userId, courseId);
     if (existingEnrollment) {
@@ -203,6 +209,12 @@ const createStripeIntent = async (userId, courseId) => {
     if (!course.is_active) {
         const err = new Error('This course is no longer available for enrollment');
         err.statusCode = 403;
+        throw err;
+    }
+
+    if (!course.price_usd || Number(course.price_usd) <= 0) {
+        const err = new Error('Stripe payments require a course price greater than 0 USD');
+        err.statusCode = 400;
         throw err;
     }
 

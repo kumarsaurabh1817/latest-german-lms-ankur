@@ -10,7 +10,7 @@ const courseSchema = z.object({
   level: z.enum(['A1', 'A2', 'B1', 'B2']),
   description: z.string().optional(),
   short_description: z.string().max(500).optional(),
-  price_inr: z.number().min(0),
+  price_inr: z.number().min(1),
   price_usd: z.number().min(0),
   duration_weeks: z.number().int().min(1).optional(),
   max_students: z.number().int().min(1).optional(),

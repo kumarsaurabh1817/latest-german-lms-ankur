@@ -17,6 +17,7 @@ app.use(cors({
   credentials: true,
 }));
 
+
 // ─── Payment Webhooks (MUST be registered BEFORE express.json()) ─────────────
 // Both Stripe and Razorpay require the raw, unparsed request body to verify
 // the HMAC signature. express.json() would parse the body into an object and
