@@ -4,7 +4,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoadingSpinner from "./components/LoadingSpinner";
-import WhatsAppButton from "./components/WhatsAppButton";
+import SocialFloatingButtons from "./components/SocialFloatingButtons";
 import ScrollToTop from "./components/ScrollToTop";
 
 import Home from "./pages/Home";
@@ -108,7 +108,7 @@ const App = () => {
         </Routes>
       </main>
       <Footer />
-      <WhatsAppButton />
+      <SocialFloatingButtons />
     </div>
   );
 };
