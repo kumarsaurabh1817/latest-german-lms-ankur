@@ -62,6 +62,18 @@ class AuthService {
       throw error;
     }
 
+    // Block unapproved teachers from signing in.
+    // A dedicated errorCode lets the frontend show a distinct "pending" banner
+    // instead of a generic red error message.
+    if (user.role === 'teacher' && !user.is_teacher_approved) {
+      const error = new Error(
+        'Your teacher account is pending admin approval. You will be able to sign in once an admin reviews your account.'
+      );
+      error.statusCode = 403;
+      error.errorCode = 'TEACHER_PENDING_APPROVAL';
+      throw error;
+    }
+
     const token = generateToken(user.id);
     
     // Remove password from response

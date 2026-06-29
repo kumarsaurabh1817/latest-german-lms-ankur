@@ -20,6 +20,8 @@ const errorHandler = (err, req, res, _next) => {
   res.status(statusCode).json({
     success: false,
     message,
+    // Pass through any semantic error code the service layer attached (e.g. TEACHER_PENDING_APPROVAL)
+    errorCode: err.errorCode || undefined,
     error: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };

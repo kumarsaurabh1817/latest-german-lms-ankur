@@ -22,15 +22,21 @@ const buildClearCookieOptions = () => {
 const register = async (req, res, next) => {
   try {
     const { user, token } = await AuthService.register(req.body);
-    
-    const cookieOptions = buildCookieOptions();
-    
-    res.status(201)
-      .cookie('token', token, cookieOptions)
-      .json({ 
-        success: true, 
-        user 
-      });
+
+    // Unapproved teachers must not receive an auth cookie.
+    // If we set one here they would be silently re-logged-in on every
+    // page refresh (getMe() validates the cookie regardless of approval status).
+    const isPendingTeacher = user.role === 'teacher' && !user.is_teacher_approved;
+
+    const response = res.status(201);
+    if (!isPendingTeacher) {
+      response.cookie('token', token, buildCookieOptions());
+    }
+
+    response.json({
+      success: true,
+      user,
+    });
   } catch (err) {
     next(err);
   }

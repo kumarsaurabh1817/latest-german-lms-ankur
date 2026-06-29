@@ -328,7 +328,7 @@ const handleEnroll = async (method) => {
       setEditingCourse(false);
       toast.success("Course updated successfully");
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to update course');
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to update course');
     }
   };
 
@@ -337,9 +337,12 @@ const handleEnroll = async (method) => {
       title: course.title,
       level: course.level,
       description: course.description,
-      price_inr: course.price_inr,
-      price_usd: course.price_usd,
-      duration_weeks: course.duration_weeks,
+      // PostgreSQL DECIMAL columns come back as strings from the pg driver.
+      // Zod v4 is strict about types, so we must convert them to numbers here
+      // so the PUT /courses/:id validation does not fail with a 500 error.
+      price_inr: Number(course.price_inr),
+      price_usd: Number(course.price_usd),
+      duration_weeks: Number(course.duration_weeks) || 1,
       thumbnail_url: course.thumbnail_url || '',
       features: Array.isArray(course.features) ? course.features : [],
     });
@@ -915,7 +918,14 @@ const handleEnroll = async (method) => {
               {/* Sticky Footer */}
               <div className="px-6 py-4 flex gap-3 justify-end border-t border-neutral-100 flex-shrink-0 bg-neutral-50/50 rounded-b-2xl">
                 <button type="button" onClick={() => setEditingCourse(false)} className="btn-ghost px-5 py-2.5">Cancel</button>
-                <button type="submit" className="btn-primary px-8 py-2.5 shadow-md">Save Changes</button>
+                <button
+                  type="submit"
+                  className="btn-primary px-8 py-2.5 shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={uploadingThumbnail}
+                  title={uploadingThumbnail ? 'Please wait for the image to finish uploading' : undefined}
+                >
+                  {uploadingThumbnail ? 'Uploading image…' : 'Save Changes'}
+                </button>
               </div>
             </form>
           </div>

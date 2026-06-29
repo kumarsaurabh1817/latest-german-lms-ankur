@@ -6,11 +6,13 @@ const validate = (schema) => (req, res, next) => {
     next();
   } catch (err) {
     if (err instanceof ZodError) {
-      const firstError = err.errors[0]?.message || 'Validation failed';
+      // Zod v4 uses `issues`; v3 used `errors` — support both for safety
+      const issueList = err.issues ?? err.errors ?? [];
+      const firstError = issueList[0]?.message || 'Validation failed';
       return res.status(400).json({ 
         success: false, 
         message: firstError,
-        errors: err.errors 
+        errors: issueList 
       });
     }
     next(err);

@@ -26,7 +26,12 @@ const Register = () => {
     }
     setLoading(true);
     try {
-      await register(form);
+      const result = await register(form);
+      // Teacher accounts need admin approval — redirect to login with an info banner
+      if (result?.pendingApproval) {
+        navigate('/login', { replace: true, state: { pendingApproval: true } });
+        return;
+      }
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const errorData = err.response?.data;
@@ -89,7 +94,9 @@ const Register = () => {
                 <option value="teacher">Educator (Teacher)</option>
               </select>
               {form.role === 'teacher' && (
-                <p className="text-xs text-amber-600 mt-1">Educator accounts require admin approval before you can create courses.</p>
+                <p className="text-xs text-amber-600 mt-1">
+                  Educator accounts require admin approval before you can sign in or create courses.
+                </p>
               )}
             </div>
             <button type="submit" className="btn-primary w-full" disabled={loading}>

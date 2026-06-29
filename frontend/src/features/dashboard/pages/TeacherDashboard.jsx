@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import api from '../../../utils/api';
 import LoadingSpinner from '../../../components/LoadingSpinner';
+import CourseService from '../../courses/services/courseService';
 
 const tabs = ['My Courses', 'Create Course', 'Upcoming Classes'];
 const COURSE_TITLE_MIN = 5;
@@ -41,6 +42,7 @@ const TeacherDashboard = () => {
   const [courseFeatureInput, setCourseFeatureInput] = useState('');
   const [creatingCourse, setCreatingCourse] = useState(false);
   const [courseMsg, setCourseMsg] = useState('');
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const [scheduleMsg, setScheduleMsg] = useState('');
 
@@ -60,6 +62,20 @@ const TeacherDashboard = () => {
       ...prev,
       features: prev.features.filter((feature) => feature !== featureToRemove),
     }));
+  };
+
+  const handleThumbnailUpload = async (file) => {
+    if (!file) return;
+    setUploadingThumbnail(true);
+    setCourseMsg('');
+    try {
+      const { url } = await CourseService.uploadThumbnail(file);
+      setCourseForm((prev) => ({ ...prev, thumbnail_url: url }));
+    } catch (err) {
+      setCourseMsg(err.response?.data?.message || err.response?.data?.error || 'Thumbnail upload failed. Please try again.');
+    } finally {
+      setUploadingThumbnail(false);
+    }
   };
 
   useEffect(() => {
@@ -185,8 +201,22 @@ const TeacherDashboard = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {courses.map((c) => (
-                      <div key={c.id} className="card p-5 hover:border-primary-300 transition-colors group relative flex flex-col justify-between">
-                        <div>
+                      <div key={c.id} className="card p-0 overflow-hidden hover:border-primary-300 transition-colors group relative flex flex-col justify-between">
+                        {/* Thumbnail */}
+                        {c.thumbnail_url ? (
+                          <img
+                            src={c.thumbnail_url}
+                            alt={c.title}
+                            className="w-full h-36 object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-36 bg-gradient-to-br from-primary-50 to-neutral-100 flex items-center justify-center">
+                            <svg className="w-10 h-10 text-neutral-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="p-5 flex flex-col flex-1">
                           <div className="flex items-center justify-between mb-3">
                             <span className="badge badge-level">{c.level}</span>
                             <span className="text-xs text-neutral-400 font-medium bg-neutral-100 px-2 py-1 rounded-full">{c.enrolled_count || 0} enrolled</span>
@@ -197,15 +227,15 @@ const TeacherDashboard = () => {
                               <p className="text-neutral-500 text-sm mt-1 line-clamp-2">{c.description}</p>
                             )}
                           </Link>
-                        </div>
-                        <div className="mt-4 pt-3 border-t border-neutral-100 flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Link to={`/courses/${c.id}`} className="text-sm text-primary-600 hover:text-primary-800 font-medium">Edit</Link>
-                            <button onClick={async () => {
-                                if(window.confirm('Delete this course?')) {
-                                    await api.delete(`/courses/${c.id}`);
-                                    setCourses(courses.filter(co => co.id !== c.id));
-                                }
-                            }} className="text-sm text-red-500 hover:text-red-700 font-medium">Remove</button>
+                          <div className="mt-4 pt-3 border-t border-neutral-100 flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Link to={`/courses/${c.id}`} className="text-sm text-primary-600 hover:text-primary-800 font-medium">Edit</Link>
+                              <button onClick={async () => {
+                                  if(window.confirm('Delete this course?')) {
+                                      await api.delete(`/courses/${c.id}`);
+                                      setCourses(courses.filter(co => co.id !== c.id));
+                                  }
+                              }} className="text-sm text-red-500 hover:text-red-700 font-medium">Remove</button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -326,13 +356,56 @@ const TeacherDashboard = () => {
                             required
                           />
                       </div>
-                      <div>
-                          <label className="label">Thumbnail URL <span className="text-neutral-400 text-xs font-normal">(optional)</span></label>
-                          <input value={courseForm.thumbnail_url} onChange={(e) => setCourseForm({ ...courseForm, thumbnail_url: e.target.value })} className="input" placeholder="https://..." />
+                      <div className="col-span-2">
+                        <label className="label">Course Thumbnail <span className="text-neutral-400 text-xs font-normal">(optional)</span></label>
+                        <div className="space-y-2">
+                          {/* Preview */}
+                          {courseForm.thumbnail_url && (
+                            <img
+                              src={courseForm.thumbnail_url}
+                              alt="Thumbnail preview"
+                              className="w-full h-36 object-cover rounded-lg border border-neutral-200"
+                            />
+                          )}
+                          {/* URL input */}
+                          <input
+                            value={courseForm.thumbnail_url}
+                            onChange={(e) => setCourseForm({ ...courseForm, thumbnail_url: e.target.value })}
+                            className="input"
+                            placeholder="Paste an image URL, or upload below"
+                          />
+                          {/* File upload */}
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer btn-secondary py-2 px-3 text-sm">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                              </svg>
+                              {uploadingThumbnail ? 'Uploading…' : 'Upload from device'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingThumbnail}
+                                onChange={(e) => handleThumbnailUpload(e.target.files?.[0] || null)}
+                              />
+                            </label>
+                            {uploadingThumbnail && <LoadingSpinner size="sm" />}
+                            {courseForm.thumbnail_url && !uploadingThumbnail && (
+                              <button
+                                type="button"
+                                onClick={() => setCourseForm((p) => ({ ...p, thumbnail_url: '' }))}
+                                className="text-xs text-red-500 hover:text-red-700"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-neutral-400">Upload an image from your device — it will be stored on Cloudinary automatically.</p>
+                        </div>
                       </div>
                     </div>
-                    <button type="submit" className="btn-primary w-full mt-4" disabled={creatingCourse || !teacherApproved}>
-                      {creatingCourse ? <span className="flex items-center justify-center gap-2"><LoadingSpinner size="sm" /> Creating...</span> : 'Create Course'}
+                    <button type="submit" className="btn-primary w-full mt-4" disabled={creatingCourse || uploadingThumbnail || !teacherApproved}>
+                      {creatingCourse ? <span className="flex items-center justify-center gap-2"><LoadingSpinner size="sm" /> Creating...</span> : uploadingThumbnail ? 'Uploading image…' : 'Create Course'}
                     </button>
                   </form>
                 )}

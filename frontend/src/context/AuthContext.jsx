@@ -12,7 +12,14 @@ export const AuthProvider = ({ children }) => {
       try {
         const res = await AuthService.getMe();
         if (res.success) {
-          setUser(res.user);
+          // Safety net: if a stale cookie exists for a pending teacher
+          // (e.g. from an account created before the backend fix was deployed),
+          // clear it immediately so the teacher is not silently logged in.
+          if (res.user?.role === 'teacher' && !res.user?.is_teacher_approved) {
+            await AuthService.logout();
+          } else {
+            setUser(res.user);
+          }
         }
       } catch (error) {
         void error;
@@ -59,9 +66,15 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (formData) => {
     const res = await AuthService.register(formData);
-    if(res.success) {
-        setUser(res.user);
-        return res.user;
+    if (res.success) {
+      // Teachers require admin approval before they can sign in.
+      // Don't auto-log them in — return a pending flag so the
+      // Register page can redirect to /login with an info message.
+      if (res.user?.role === 'teacher' && !res.user?.is_teacher_approved) {
+        return { ...res.user, pendingApproval: true };
+      }
+      setUser(res.user);
+      return res.user;
     }
     throw new Error(res.message || 'Registration failed');
   };
