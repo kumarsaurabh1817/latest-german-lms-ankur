@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireRole } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const {
   createRazorpayOrderSchema,
@@ -14,6 +14,7 @@ const {
   createStripeIntent,
   confirmStripePayment,
   getMyPayments,
+  getAllPayments,
 } = require('../controllers/paymentController');
 
 /**
@@ -70,5 +71,10 @@ router.post(
 // ─── History ─────────────────────────────────────────────────────────────────
 // GET /api/payments/my — list authenticated user's payments
 router.get('/my', authenticate, getMyPayments);
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+// GET /api/payments — all platform payments (admin-only)
+// Optional query: ?status=completed&payment_method=razorpay
+router.get('/', authenticate, requireRole('admin'), getAllPayments);
 
 module.exports = router;

@@ -41,8 +41,57 @@ const getEnrolledStudents = async (courseId) => {
   return await EnrollmentModel.getEnrolledStudents(courseId);
 };
 
+/**
+ * Admin-only: list all active enrollments across the entire platform.
+ */
+const getAllEnrollments = async () => {
+  return await EnrollmentModel.findAll();
+};
+
+/**
+ * Admin-only: manually enroll any student in any active course.
+ * Skips the payment check that the regular enrollStudent() enforces.
+ * Uses an UPSERT so re-enrolling after an unenroll (soft-delete) works correctly.
+ */
+const adminEnrollStudent = async ({ student_id, course_id }) => {
+  const course = await CourseModel.findById(course_id);
+  if (!course) {
+    const err = new Error('Course not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (!course.is_active) {
+    const err = new Error('This course is no longer available for enrollment');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // UPSERT: inserts a new row or reactivates a soft-deleted one.
+  // No payment required for admin-initiated enrollment.
+  const enrollment = await EnrollmentModel.create({ student_id, course_id, payment_id: null });
+  return enrollment;
+};
+
+
+
+/**
+ * Admin-only: unenroll a student from a course (soft-delete).
+ */
+const unenrollStudent = async ({ student_id, course_id }) => {
+  const result = await EnrollmentModel.deleteByStudentAndCourse(student_id, course_id);
+  if (!result) {
+    const err = new Error('Active enrollment not found for this student and course');
+    err.statusCode = 404;
+    throw err;
+  }
+  return result;
+};
+
 module.exports = {
   getMyEnrollments,
   enrollStudent,
-  getEnrolledStudents
+  getEnrolledStudents,
+  getAllEnrollments,
+  adminEnrollStudent,
+  unenrollStudent
 };

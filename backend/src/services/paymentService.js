@@ -185,7 +185,11 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
         await client.query(
             `INSERT INTO enrollments (student_id, course_id, payment_id)
              VALUES ($1, $2, $3)
-             ON CONFLICT (student_id, course_id) DO NOTHING`,
+             ON CONFLICT (student_id, course_id)
+               DO UPDATE SET
+                 is_active   = true,
+                 payment_id  = EXCLUDED.payment_id,
+                 enrolled_at = NOW()`,
             [payment.student_id, payment.course_id, payment.id]
         );
         await client.query('COMMIT');
@@ -292,7 +296,11 @@ const confirmStripePayment = async (userId, { payment_intent_id }) => {
         await client.query(
             `INSERT INTO enrollments (student_id, course_id, payment_id)
              VALUES ($1, $2, $3)
-             ON CONFLICT (student_id, course_id) DO NOTHING`,
+             ON CONFLICT (student_id, course_id)
+               DO UPDATE SET
+                 is_active   = true,
+                 payment_id  = EXCLUDED.payment_id,
+                 enrolled_at = NOW()`,
             [payment.student_id, payment.course_id, payment.id]
         );
         await client.query('COMMIT');
@@ -373,7 +381,11 @@ const handleStripeWebhook = async (rawBody, signature) => {
             await client.query(
                 `INSERT INTO enrollments (student_id, course_id, payment_id)
                  VALUES ($1, $2, $3)
-                 ON CONFLICT (student_id, course_id) DO NOTHING`,
+                 ON CONFLICT (student_id, course_id)
+                   DO UPDATE SET
+                     is_active   = true,
+                     payment_id  = EXCLUDED.payment_id,
+                     enrolled_at = NOW()`,
                 [payment.student_id, payment.course_id, payment.id]
             );
             await client.query('COMMIT');
@@ -473,7 +485,11 @@ const handleRazorpayWebhook = async (rawBody, signature) => {
             await client.query(
                 `INSERT INTO enrollments (student_id, course_id, payment_id)
                  VALUES ($1, $2, $3)
-                 ON CONFLICT (student_id, course_id) DO NOTHING`,
+                 ON CONFLICT (student_id, course_id)
+                   DO UPDATE SET
+                     is_active   = true,
+                     payment_id  = EXCLUDED.payment_id,
+                     enrolled_at = NOW()`,
                 [payment.student_id, payment.course_id, payment.id]
             );
             await client.query('COMMIT');
@@ -492,6 +508,14 @@ const getMyPayments = async (userId) => {
     return await PaymentModel.findByUser(userId);
 };
 
+/**
+ * Admin-only: retrieve all payments with optional filters.
+ * @param {{ status?: string, payment_method?: string }} filters
+ */
+const getAllPayments = async (filters = {}) => {
+    return await PaymentModel.findAll(filters);
+};
+
 module.exports = {
     createRazorpayOrder,
     verifyRazorpayPayment,
@@ -499,5 +523,6 @@ module.exports = {
     confirmStripePayment,
     handleStripeWebhook,
     handleRazorpayWebhook,
-    getMyPayments
+    getMyPayments,
+    getAllPayments
 };

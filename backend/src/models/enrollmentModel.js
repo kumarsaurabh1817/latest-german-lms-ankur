@@ -5,7 +5,11 @@ class EnrollmentModel {
     const result = await db.query(
       `INSERT INTO enrollments (student_id, course_id, payment_id)
        VALUES ($1, $2, $3)
-       ON CONFLICT (student_id, course_id) DO NOTHING
+       ON CONFLICT (student_id, course_id)
+         DO UPDATE SET
+           is_active  = true,
+           payment_id = COALESCE(EXCLUDED.payment_id, enrollments.payment_id),
+           enrolled_at = NOW()
        RETURNING *`,
       [student_id, course_id, payment_id || null]
     );
@@ -46,6 +50,46 @@ class EnrollmentModel {
       [course_id]
     );
     return result.rows;
+  }
+
+  /**
+   * Admin-only: return ALL active enrollments across the platform.
+   * Joins users (student) and courses so each row is fully descriptive.
+   */
+  static async findAll() {
+    const result = await db.query(
+      `SELECT
+         e.id,
+         e.enrolled_at,
+         e.is_active,
+         u.id    AS student_id,
+         u.name  AS student_name,
+         u.email AS student_email,
+         c.id    AS course_id,
+         c.title AS course_title,
+         c.level AS course_level
+       FROM enrollments e
+       JOIN users   u ON e.student_id = u.id
+       JOIN courses c ON e.course_id  = c.id
+       WHERE e.is_active = true
+       ORDER BY e.enrolled_at DESC`
+    );
+    return result.rows;
+  }
+
+  /**
+   * Admin unenroll: soft-delete (set is_active = false) for a given student + course pair.
+   * Returns the updated row, or undefined if no matching active enrollment exists.
+   */
+  static async deleteByStudentAndCourse(student_id, course_id) {
+    const result = await db.query(
+      `UPDATE enrollments
+       SET is_active = false
+       WHERE student_id = $1 AND course_id = $2 AND is_active = true
+       RETURNING *`,
+      [student_id, course_id]
+    );
+    return result.rows[0];
   }
 }
 

@@ -97,6 +97,21 @@ const getMyPayments = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/payments  (admin-only)
+ * Optional query params: status, payment_method
+ * Returns all platform payments with student name/email and course title.
+ */
+const getAllPayments = async (req, res, next) => {
+  try {
+    const { status, payment_method } = req.query;
+    const payments = await paymentService.getAllPayments({ status, payment_method });
+    res.json({ success: true, data: payments });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createRazorpayOrder,
   verifyRazorpayPayment,
@@ -104,6 +119,6 @@ module.exports = {
   confirmStripePayment,
   stripeWebhook,
   razorpayWebhook,
-  getMyPayments
+  getMyPayments,
+  getAllPayments
 };
-

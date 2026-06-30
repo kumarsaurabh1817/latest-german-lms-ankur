@@ -49,6 +49,53 @@ class PaymentModel {
     );
     return result.rows;
   }
+
+  /**
+   * Admin-only: return all payments across the platform.
+   * Joins users + courses so each row has student name/email and course title.
+   * @param {{ status?: string, payment_method?: string }} filters
+   */
+  static async findAll({ status, payment_method } = {}) {
+    const conditions = [];
+    const values = [];
+
+    if (status) {
+      values.push(status);
+      conditions.push(`p.status = $${values.length}`);
+    }
+    if (payment_method) {
+      values.push(payment_method);
+      conditions.push(`p.payment_method = $${values.length}`);
+    }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await db.query(
+      `SELECT
+         p.id,
+         p.amount,
+         p.currency,
+         p.payment_method,
+         p.status,
+         p.external_order_id,
+         p.external_payment_id,
+         p.created_at,
+         p.updated_at,
+         u.id   AS student_id,
+         u.name AS student_name,
+         u.email AS student_email,
+         c.id    AS course_id,
+         c.title AS course_title,
+         c.level AS course_level
+       FROM payments p
+       JOIN users   u ON p.student_id = u.id
+       JOIN courses c ON p.course_id  = c.id
+       ${where}
+       ORDER BY p.created_at DESC`,
+      values
+    );
+    return result.rows;
+  }
 }
 
 module.exports = PaymentModel;
