@@ -210,7 +210,13 @@ const TeacherDashboard = () => {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {courses.map((c) => (
-                      <div key={c.id} className="card p-0 overflow-hidden hover:border-primary-300 transition-colors group relative flex flex-col justify-between">
+                      <div key={c.id} className="card p-0 overflow-hidden hover:border-primary-300 transition-colors group relative flex flex-col justify-between cursor-pointer">
+                        {/* Full-card link overlay */}
+                        <Link
+                          to={`/courses/${c.id}`}
+                          className="absolute inset-0 z-0"
+                          aria-label={c.title}
+                        />
                         {/* Thumbnail */}
                         {c.thumbnail_url ? (
                           <img
@@ -225,26 +231,24 @@ const TeacherDashboard = () => {
                             </svg>
                           </div>
                         )}
-                        <div className="p-5 flex flex-col flex-1">
+                        <div className="p-5 flex flex-col flex-1 relative z-10 pointer-events-none">
                           <div className="flex items-center justify-between mb-3">
                             <span className="badge badge-level">{c.level}</span>
                             <span className="text-xs text-neutral-400 font-medium bg-neutral-100 px-2 py-1 rounded-full">{c.enrolled_count || 0} enrolled</span>
                           </div>
-                          <Link to={`/courses/${c.id}`}>
-                            <h4 className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">{c.title}</h4>
-                            {c.description && (
-                              <p className="text-neutral-500 text-sm mt-1 line-clamp-2">{c.description}</p>
-                            )}
-                          </Link>
+                          <h4 className="font-semibold text-neutral-900 group-hover:text-primary-600 transition-colors">{c.title}</h4>
+                          {c.description && (
+                            <p className="text-neutral-500 text-sm mt-1 line-clamp-2">{c.description}</p>
+                          )}
 
                           {/* Publish / Unpublish toggle */}
-                          <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between">
+                          <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between pointer-events-auto">
 
                             {/* Toggle pill — uses app secondary (green) + neutral palette */}
                             <button
-                              onClick={() => handleTogglePublish(c.id)}
+                              onClick={(e) => { e.preventDefault(); handleTogglePublish(c.id); }}
                               title={c.is_published ? 'Click to unpublish' : 'Click to publish'}
-                              className="inline-flex items-center gap-2.5 select-none focus:outline-none group/toggle"
+                              className="inline-flex items-center gap-2.5 select-none focus:outline-none group/toggle relative z-10"
                             >
                               {/* Track */}
                               <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors duration-300 ease-in-out ${
@@ -265,9 +269,10 @@ const TeacherDashboard = () => {
                               </span>
                             </button>
 
-                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity relative z-10">
                               <Link to={`/courses/${c.id}`} className="text-sm text-primary-600 hover:text-primary-800 font-medium">Edit</Link>
-                              <button onClick={async () => {
+                              <button onClick={async (e) => {
+                                e.preventDefault();
                                 if(window.confirm('Delete this course?')) {
                                     await api.delete(`/courses/${c.id}`);
                                     setCourses(courses.filter(co => co.id !== c.id));
