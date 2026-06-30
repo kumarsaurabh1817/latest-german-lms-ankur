@@ -5,6 +5,14 @@ class CourseService {
     return await CourseModel.findAll(filters);
   }
 
+  static async getMyCourses(teacherId) {
+    return await CourseModel.findByTeacher(teacherId);
+  }
+
+  static async getAllCoursesAdmin() {
+    return await CourseModel.findAllAdmin();
+  }
+
   static async getCourseDetails(id) {
     const course = await CourseModel.findById(id);
     if (!course || !course.is_active) {
@@ -93,6 +101,27 @@ class CourseService {
 
     await CourseModel.delete(id);
     return true;
+  }
+
+  /**
+   * Toggle publish state. Teachers may only toggle their own courses; admins bypass.
+   */
+  static async togglePublish(id, user) {
+    const course = await CourseModel.findById(id);
+    if (!course) {
+      const error = new Error('Course not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (user.role === 'teacher' && String(course.teacher_id) !== String(user.id)) {
+      const error = new Error('Forbidden: you do not own this course');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const updated = await CourseModel.update(id, { is_published: !course.is_published });
+    return updated;
   }
 
   /**

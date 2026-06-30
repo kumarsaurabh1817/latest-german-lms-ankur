@@ -16,7 +16,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     Promise.all([
       api.get('/users'),
-      api.get('/courses'),
+      api.get('/admin/courses'),
       api.get('/consultations'),
     ])
       .then(([u, c, co]) => {

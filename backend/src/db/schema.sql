@@ -161,6 +161,12 @@ CREATE TABLE IF NOT EXISTS consultations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Publish/unpublish toggle: new courses default to unpublished (hidden from students)
+-- NOTE: After running this migration for the first time on an existing DB,
+-- run the backfill script: node src/db/backfill_publish.js
+ALTER TABLE courses
+  ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS idx_courses_level ON courses(level);
 CREATE INDEX IF NOT EXISTS idx_courses_teacher ON courses(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_lessons_course ON lessons(course_id);

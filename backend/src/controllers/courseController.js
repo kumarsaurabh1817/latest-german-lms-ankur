@@ -14,6 +14,24 @@ exports.getAllCourses = async (req, res, next) => {
   }
 };
 
+exports.getMyCourses = async (req, res, next) => {
+  try {
+    const courses = await CourseService.getMyCourses(req.user.id);
+    res.json({ success: true, data: courses });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAllCoursesAdmin = async (req, res, next) => {
+  try {
+    const courses = await CourseService.getAllCoursesAdmin();
+    res.json({ success: true, data: courses });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getCourseById = async (req, res, next) => {
   try {
     const course = await CourseService.getCourseDetails(req.params.id);
@@ -55,6 +73,15 @@ exports.deleteCourse = async (req, res, next) => {
   try {
     await CourseService.deleteCourse(req.params.id, req.user);
     res.json({ success: true, message: 'Course deactivated successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.togglePublish = async (req, res, next) => {
+  try {
+    const course = await CourseService.togglePublish(req.params.id, req.user);
+    res.json({ success: true, data: course });
   } catch (err) {
     next(err);
   }

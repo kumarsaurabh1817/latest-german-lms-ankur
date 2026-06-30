@@ -8,7 +8,7 @@ class CourseModel {
       FROM courses c
       LEFT JOIN users u ON c.teacher_id = u.id
       LEFT JOIN enrollments e ON c.id = e.course_id AND e.is_active = true
-      WHERE c.is_active = true
+      WHERE c.is_active = true AND c.is_published = true
     `;
     const params = [];
     if (level) {
@@ -18,6 +18,36 @@ class CourseModel {
     query += ' GROUP BY c.id, u.name, u.avatar_url, c.created_at ORDER BY c.created_at DESC';
     
     const result = await db.query(query, params);
+    return result.rows;
+  }
+
+  static async findByTeacher(teacherId) {
+    const query = `
+      SELECT c.*, u.name as teacher_name, u.avatar_url as teacher_avatar,
+        COUNT(DISTINCT e.id) as enrolled_count
+      FROM courses c
+      LEFT JOIN users u ON c.teacher_id = u.id
+      LEFT JOIN enrollments e ON c.id = e.course_id AND e.is_active = true
+      WHERE c.is_active = true AND c.teacher_id = $1
+      GROUP BY c.id, u.name, u.avatar_url, c.created_at
+      ORDER BY c.created_at DESC
+    `;
+    const result = await db.query(query, [teacherId]);
+    return result.rows;
+  }
+
+  static async findAllAdmin() {
+    const query = `
+      SELECT c.*, u.name as teacher_name, u.avatar_url as teacher_avatar,
+        COUNT(DISTINCT e.id) as enrolled_count
+      FROM courses c
+      LEFT JOIN users u ON c.teacher_id = u.id
+      LEFT JOIN enrollments e ON c.id = e.course_id AND e.is_active = true
+      WHERE c.is_active = true
+      GROUP BY c.id, u.name, u.avatar_url, c.created_at
+      ORDER BY c.created_at DESC
+    `;
+    const result = await db.query(query);
     return result.rows;
   }
 
@@ -73,7 +103,8 @@ class CourseModel {
     // making it impossible to set price_inr=0 or thumbnail_url=null intentionally.
     const ALLOWED_COURSE_COLUMNS = new Set([
       'title', 'description', 'short_description', 'price_inr', 'price_usd',
-      'duration_weeks', 'max_students', 'thumbnail_url', 'features', 'is_active'
+      'duration_weeks', 'max_students', 'thumbnail_url', 'features', 'is_active',
+      'is_published'
     ]);
 
     const keys = Object.keys(data).filter(k => ALLOWED_COURSE_COLUMNS.has(k));

@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext';
 import api from '../../../utils/api';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 import CourseService from '../../courses/services/courseService';
+import toast from 'react-hot-toast';
 
 const tabs = ['My Courses', 'Create Course', 'Upcoming Classes'];
 const COURSE_TITLE_MIN = 5;
@@ -79,11 +80,9 @@ const TeacherDashboard = () => {
   };
 
   useEffect(() => {
-    Promise.all([api.get('/courses'), api.get('/lessons/upcoming')])
+    Promise.all([api.get('/courses/mine'), api.get('/lessons/upcoming')])
       .then(([c, l]) => {
-        const allCourses = c.data.data || [];
-        const teacherCourses = allCourses.filter((co) => co.teacher_id === user.id);
-        setCourses(teacherCourses);
+        setCourses(c.data.data || []);
         // Unwrap {success, data} envelope returned by updated lessonController
         setLessons(l.data?.data ?? l.data);
       })
@@ -139,18 +138,28 @@ const TeacherDashboard = () => {
     setCourseMsg('');
     try {
       await api.post('/courses', { ...courseForm, teacher_id: user.id });
-      setCourseMsg('Course created successfully!');
+      setCourseMsg('Course created successfully! It is unpublished — go to "My Courses" to publish it when ready.');
       setCourseForm({ title: '', level: 'A1', description: '', price_inr: 0, price_usd: 0, duration_weeks: 8, thumbnail_url: '', features: [] });
       setCourseFeatureInput('');
-      const { data } = await api.get('/courses');
-      const allCourses = data.data || [];
-      setCourses(allCourses.filter((co) => co.teacher_id === user.id));
+      const { data } = await api.get('/courses/mine');
+      setCourses(data.data || []);
     } catch (err) {
       const errorData = err.response?.data;
       const errorMessage = errorData?.message || errorData?.error || (Array.isArray(errorData?.errors) ? errorData.errors.map(e => e.message || e).join(', ') : 'Failed to create course');
       setCourseMsg(errorMessage);
     } finally {
       setCreatingCourse(false);
+    }
+  };
+
+  const handleTogglePublish = async (courseId) => {
+    try {
+      const { data } = await api.patch(`/courses/${courseId}/publish`);
+      const updated = data.data;
+      setCourses((prev) => prev.map((c) => (c.id === courseId ? { ...c, is_published: updated.is_published } : c)));
+      toast.success(updated.is_published ? 'Course published.' : 'Course unpublished.');
+    } catch (err) {
+      toast.error('Failed to toggle publish status');
     }
   };
 
@@ -227,15 +236,46 @@ const TeacherDashboard = () => {
                               <p className="text-neutral-500 text-sm mt-1 line-clamp-2">{c.description}</p>
                             )}
                           </Link>
-                          <div className="mt-4 pt-3 border-t border-neutral-100 flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                          {/* Publish / Unpublish toggle */}
+                          <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center justify-between">
+
+                            {/* Toggle pill — uses app secondary (green) + neutral palette */}
+                            <button
+                              onClick={() => handleTogglePublish(c.id)}
+                              title={c.is_published ? 'Click to unpublish' : 'Click to publish'}
+                              className="inline-flex items-center gap-2.5 select-none focus:outline-none group/toggle"
+                            >
+                              {/* Track */}
+                              <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full transition-colors duration-300 ease-in-out ${
+                                c.is_published ? 'bg-secondary-500' : 'bg-neutral-300'
+                              }`}>
+                                {/* Thumb */}
+                                <span className={`absolute top-0.5 left-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-300 ease-in-out ${
+                                  c.is_published ? 'translate-x-4' : 'translate-x-0'
+                                }`} />
+                              </span>
+                              {/* Label */}
+                              <span className={`text-xs font-semibold transition-colors duration-200 ${
+                                c.is_published
+                                  ? 'text-secondary-700'
+                                  : 'text-neutral-400 group-hover/toggle:text-neutral-600'
+                              }`}>
+                                {c.is_published ? 'Published' : 'Unpublished'}
+                              </span>
+                            </button>
+
+                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Link to={`/courses/${c.id}`} className="text-sm text-primary-600 hover:text-primary-800 font-medium">Edit</Link>
                               <button onClick={async () => {
-                                  if(window.confirm('Delete this course?')) {
-                                      await api.delete(`/courses/${c.id}`);
-                                      setCourses(courses.filter(co => co.id !== c.id));
-                                  }
+                                if(window.confirm('Delete this course?')) {
+                                    await api.delete(`/courses/${c.id}`);
+                                    setCourses(courses.filter(co => co.id !== c.id));
+                                }
                               }} className="text-sm text-red-500 hover:text-red-700 font-medium">Remove</button>
+                            </div>
                           </div>
+
                         </div>
                       </div>
                     ))}
@@ -400,7 +440,7 @@ const TeacherDashboard = () => {
                               </button>
                             )}
                           </div>
-                          <p className="text-xs text-neutral-400">Upload an image from your device — it will be stored on Cloudinary automatically.</p>
+                          <p className="text-xs text-neutral-400">Upload an image from your device.</p>
                         </div>
                       </div>
                     </div>

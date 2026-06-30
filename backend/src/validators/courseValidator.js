@@ -23,6 +23,7 @@ const courseSchema = z.object({
 
 const courseUpdateSchema = courseSchema.partial().extend({
   is_active: z.boolean().optional(),
+  is_published: z.boolean().optional(),
 });
 
 module.exports = { courseSchema, courseUpdateSchema, COURSE_TITLE_MIN, COURSE_TITLE_MAX };
